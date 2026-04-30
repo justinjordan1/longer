@@ -15,7 +15,7 @@ type FeedPost = {
   comment_count: number
   considered_score: number
   last_comment_at: string | null
-  profiles: { handle: string }
+  handle: string
 }
 
 export default async function FeedPage() {
@@ -26,13 +26,42 @@ export default async function FeedPage() {
 
   const nowIso = new Date().toISOString()
 
-  // Posts published already (RLS also allows seeing your own scheduled ones,
-  // but for the public columns we filter to published only)
-  const { data: visible } = await supabase
-    .from('posts_with_metrics')
-    .select('id, title, publish_at, word_count, is_removed, editorial_flag, up_count, down_count, comment_count, considered_score, last_comment_at, profiles!inner(handle)')
-    .lte('publish_at', nowIso)
-    .returns<FeedPost[]>()
+  // Query posts directly so the foreign key to profiles resolves.
+  // Then merge in metrics via a parallel query on the view.
+  const [postsRes, metricsRes] = await Promise.all([
+    supabase
+      .from('posts')
+      .select('id, title, publish_at, word_count, is_removed, editorial_flag, profiles:author_id(handle)')
+      .lte('publish_at', nowIso),
+    supabase
+      .from('post_metrics')
+      .select('id, up_count, down_count, comment_count, last_comment_at'),
+  ])
+
+  const metricsById = new Map<string, any>()
+  for (const m of metricsRes.data ?? []) {
+    metricsById.set(m.id, m)
+  }
+
+  const visible: FeedPost[] = (postsRes.data ?? []).map((p: any) => {
+    const m = metricsById.get(p.id) ?? {
+      up_count: 0, down_count: 0, comment_count: 0, last_comment_at: null,
+    }
+    return {
+      id: p.id,
+      title: p.title,
+      publish_at: p.publish_at,
+      word_count: p.word_count,
+      is_removed: p.is_removed,
+      editorial_flag: p.editorial_flag,
+      handle: p.profiles?.handle ?? '?',
+      up_count: m.up_count,
+      down_count: m.down_count,
+      comment_count: m.comment_count,
+      last_comment_at: m.last_comment_at,
+      considered_score: (m.up_count - m.down_count) + m.comment_count * 3,
+    }
+  })
 
   // Your own scheduled (not yet published) posts
   const { data: scheduled } = await supabase
@@ -42,13 +71,11 @@ export default async function FeedPage() {
     .gt('publish_at', nowIso)
     .order('publish_at', { ascending: true })
 
-  const posts: FeedPost[] = visible || []
-
-  const newlyPosted    = [...posts].sort((a, b) => +new Date(b.publish_at) - +new Date(a.publish_at))
-  const newlyDiscussed = [...posts]
+  const newlyPosted    = [...visible].sort((a, b) => +new Date(b.publish_at) - +new Date(a.publish_at))
+  const newlyDiscussed = [...visible]
     .filter(p => p.last_comment_at)
     .sort((a, b) => +new Date(b.last_comment_at!) - +new Date(a.last_comment_at!))
-  const mostConsidered = [...posts].sort((a, b) => b.considered_score - a.considered_score)
+  const mostConsidered = [...visible].sort((a, b) => b.considered_score - a.considered_score)
 
   return (
     <div style={{ maxWidth: 1280, margin: '0 auto', padding: '24px 20px' }}>
@@ -76,7 +103,7 @@ export default async function FeedPage() {
         </div>
       )}
 
-      {posts.length === 0 && (!scheduled || scheduled.length === 0) && (
+      {visible.length === 0 && (!scheduled || scheduled.length === 0) && (
         <div className="panel" style={{ padding: 40, textAlign: 'center', marginTop: 20 }}>
           <pre className="ascii muted" style={{ fontSize: 11, marginBottom: 14 }}>
 {`╔══════════════════════════╗
@@ -89,7 +116,7 @@ export default async function FeedPage() {
         </div>
       )}
 
-      {posts.length > 0 && (
+      {visible.length > 0 && (
         <div style={{
           display: 'grid',
           gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))',
@@ -135,7 +162,7 @@ function Column({
                   {flag && <span className="flag-badge">{flag.label}</span>}
                 </div>
                 <div className="muted" style={{ fontSize: 11.5 }}>
-                  <span className="accent">@</span>{p.profiles.handle} · {p.word_count} wd · {timeAgo(p.publish_at)}
+                  <span className="accent">@</span>{p.handle} · {p.word_count} wd · {timeAgo(p.publish_at)}
                 </div>
                 <div className="muted" style={{ fontSize: 11.5, marginTop: 2 }}>
                   <span className="positive">↑{p.up_count}</span>{' '}
