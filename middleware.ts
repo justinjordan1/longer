@@ -25,44 +25,38 @@ export async function middleware(request: NextRequest) {
     }
   )
 
-  // Refresh the session
   const { data: { user } } = await supabase.auth.getUser()
-
   const path = request.nextUrl.pathname
-  const isPublic     = path === '/login' || path.startsWith('/auth/')
-  const isOnboarding = path === '/onboarding'
 
-  // Not signed in → /login (unless already there or in callback)
-  if (!user && !isPublic) {
+  // Public routes — login page and the OAuth callback chain
+  const isPublic = path === '/login' || path === '/guidelines' || path.startsWith('/auth/')
+
+  // Not signed in: only public routes are reachable
+  if (!user) {
+    if (isPublic) return response
     return NextResponse.redirect(new URL('/login', request.url))
   }
 
-  // Signed in but no profile → force /onboarding
-  if (user && !isPublic && !isOnboarding) {
-    const { data: profile } = await supabase
-      .from('profiles')
-      .select('id')
-      .eq('id', user.id)
-      .maybeSingle()
+  // Signed in: figure out if they have a profile
+  const { data: profile } = await supabase
+    .from('profiles')
+    .select('id')
+    .eq('id', user.id)
+    .maybeSingle()
 
-    if (!profile) {
-      return NextResponse.redirect(new URL('/onboarding', request.url))
-    }
+  const isOnboarding = path === '/onboarding'
+
+  // Has profile, on onboarding page → send home
+  if (profile && isOnboarding) {
+    return NextResponse.redirect(new URL('/', request.url))
   }
 
-  // Signed in WITH profile but visiting /onboarding → send home
-  if (user && isOnboarding) {
-    const { data: profile } = await supabase
-      .from('profiles')
-      .select('id')
-      .eq('id', user.id)
-      .maybeSingle()
-
-    if (profile) {
-      return NextResponse.redirect(new URL('/', request.url))
-    }
+  // No profile, not on onboarding → force them there
+  if (!profile && !isOnboarding) {
+    return NextResponse.redirect(new URL('/onboarding', request.url))
   }
 
+  // Everything fine — let it through
   return response
 }
 

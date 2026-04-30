@@ -66,6 +66,9 @@ export default async function RootLayout({
                       [console{openReports > 0 ? ` · ${openReports}` : ''}]
                     </Link>
                   )}
+                  <Link href="/guidelines" className="link" style={{ fontSize: 11.5 }}>
+                    [guidelines]
+                  </Link>
                   <SignOutButton />
                 </div>
               </div>

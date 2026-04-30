@@ -1,4 +1,5 @@
 'use client'
+import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
 
 export default function LoginPage() {
@@ -19,7 +20,7 @@ export default function LoginPage() {
       <div className="max-w-md w-full">
         <h1 className="text-3xl font-bold mb-2">LONGER</h1>
         <p className="mb-8 text-sm">
-         A place for some longer thoughts I guess. Posts must run at least
+          A place for some longer thoughts I guess. Posts must run at least
           500 words. Comments at least 40.
         </p>
         <button
@@ -29,7 +30,10 @@ export default function LoginPage() {
           Sign in with Georgia Tech account
         </button>
         <p className="text-xs mt-6 opacity-60">
-          You'll be redirected to Microsoft to verify your @gatech.edu identity.
+          You'll be redirected to Microsoft to verify your @gatech.edu identity.{' '}
+          <Link href="/guidelines" style={{ textDecoration: 'underline' }}>
+            read the guidelines first
+          </Link>.
         </p>
       </div>
     </main>
