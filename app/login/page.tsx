@@ -19,8 +19,8 @@ export default function LoginPage() {
       <div className="max-w-md w-full">
         <h1 className="text-3xl font-bold mb-2">LONGER</h1>
         <p className="mb-8 text-sm">
-          A reading-and-writing room for Georgia Tech students. Posts must run
-          at least 500 words. Comments at least 40. Take your time.
+         A place for some longer thoughts I guess. Posts must run at least
+          500 words. Comments at least 40.
         </p>
         <button
           onClick={signIn}
