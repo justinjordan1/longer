@@ -4,7 +4,7 @@ import { revalidatePath } from 'next/cache'
 import { redirect } from 'next/navigation'
 import { POST_MIN_WORDS, COMMENT_MIN_WORDS, countWords } from '@/lib/longer'
 
-const POST_DELAY_MIN = 15
+const POST_DELAY_MIN = 5
 
 export async function createPost(formData: FormData) {
   const supabase = await createClient()
@@ -41,6 +41,78 @@ export async function createPost(formData: FormData) {
 
   revalidatePath('/')
   redirect('/')
+}
+
+export async function updateScheduledPost(postId: string, formData: FormData) {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return { error: 'not authenticated' }
+
+  const title = String(formData.get('title') || '').trim()
+  const body  = String(formData.get('body')  || '').trim()
+  const wordCount = countWords(body)
+
+  if (!title || title.length > 200) {
+    return { error: 'title required (max 200 chars)' }
+  }
+  if (wordCount < POST_MIN_WORDS) {
+    return { error: `${POST_MIN_WORDS - wordCount} more words needed` }
+  }
+
+  // Re-check this post is still in review and owned by the user. RLS allows
+  // SELECT for own posts; we have no UPDATE policy, so we go through a
+  // server-side check + raw update with the user's session.
+  const { data: existing } = await supabase
+    .from('posts')
+    .select('id, author_id, publish_at')
+    .eq('id', postId)
+    .maybeSingle()
+
+  if (!existing)                            return { error: 'post not found' }
+  if (existing.author_id !== user.id)       return { error: 'not your post' }
+  if (new Date(existing.publish_at) <= new Date())
+                                            return { error: 'review window has closed' }
+
+  const { error } = await supabase
+    .from('posts')
+    .update({ title, body, word_count: wordCount })
+    .eq('id', postId)
+    .eq('author_id', user.id)
+    .gt('publish_at', new Date().toISOString())
+
+  if (error) return { error: error.message }
+
+  revalidatePath('/')
+  redirect('/')
+}
+
+export async function discardScheduledPost(postId: string) {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return { error: 'not authenticated' }
+
+  const { data: existing } = await supabase
+    .from('posts')
+    .select('id, author_id, publish_at')
+    .eq('id', postId)
+    .maybeSingle()
+
+  if (!existing)                            return { error: 'post not found' }
+  if (existing.author_id !== user.id)       return { error: 'not your post' }
+  if (new Date(existing.publish_at) <= new Date())
+                                            return { error: 'too late to discard' }
+
+  const { error } = await supabase
+    .from('posts')
+    .delete()
+    .eq('id', postId)
+    .eq('author_id', user.id)
+    .gt('publish_at', new Date().toISOString())
+
+  if (error) return { error: error.message }
+
+  revalidatePath('/')
+  return { success: true }
 }
 
 export async function createComment(postId: string, body: string) {
@@ -109,7 +181,6 @@ export async function fileReport(postId: string, kind: 'hateful' | 'ai') {
     reporter_id: user.id,
     kind,
   })
-  // 23505 = unique violation (already reported); treat as success
   if (error && error.code !== '23505') return { error: error.message }
 
   revalidatePath(`/post/${postId}`)

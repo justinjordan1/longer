@@ -1,81 +1,152 @@
-'use client'
-import { useState } from 'react'
-import { useRouter } from 'next/navigation'
-import { createClient } from '@/lib/supabase/client'
+import { createClient } from '@/lib/supabase/server'
+import Link from 'next/link'
+import { timeAgo, timeUntil, flagByValue } from '@/lib/longer'
 
-export default function OnboardingPage() {
-  const [handle, setHandle] = useState('')
-  const [error, setError] = useState('')
-  const [loading, setLoading] = useState(false)
-  const router = useRouter()
-  const supabase = createClient()
+type FeedPost = {
+  id: string
+  title: string
+  publish_at: string
+  word_count: number
+  is_removed: boolean
+  editorial_flag: string | null
+  up_count: number
+  down_count: number
+  comment_count: number
+  considered_score: number
+  last_comment_at: string | null
+  profiles: { handle: string }
+}
 
-  const valid = /^[a-z0-9_]{3,20}$/.test(handle)
+export default async function FeedPage() {
+  const supabase = await createClient()
 
-  const submit = async () => {
-    if (!valid || loading) return
-    setLoading(true)
-    setError('')
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return null
 
-    const { data: { user } } = await supabase.auth.getUser()
-    if (!user) {
-      router.push('/login')
-      return
-    }
+  const nowIso = new Date().toISOString()
 
-    const { error: insertError } = await supabase.from('profiles').insert({
-      id: user.id,
-      handle,
-    })
+  // Posts published already (RLS also allows seeing your own scheduled ones,
+  // but for the public columns we filter to published only)
+  const { data: visible } = await supabase
+    .from('posts_with_metrics')
+    .select('id, title, publish_at, word_count, is_removed, editorial_flag, up_count, down_count, comment_count, considered_score, last_comment_at, profiles!inner(handle)')
+    .lte('publish_at', nowIso)
+    .returns<FeedPost[]>()
 
-    if (insertError) {
-      if (insertError.code === '23505') {
-        setError('that handle is taken. try another.')
-      } else {
-        setError(insertError.message)
-      }
-      setLoading(false)
-      return
-    }
+  // Your own scheduled (not yet published) posts
+  const { data: scheduled } = await supabase
+    .from('posts')
+    .select('id, title, publish_at')
+    .eq('author_id', user.id)
+    .gt('publish_at', nowIso)
+    .order('publish_at', { ascending: true })
 
-    router.push('/')
-  }
+  const posts: FeedPost[] = visible || []
+
+  const newlyPosted    = [...posts].sort((a, b) => +new Date(b.publish_at) - +new Date(a.publish_at))
+  const newlyDiscussed = [...posts]
+    .filter(p => p.last_comment_at)
+    .sort((a, b) => +new Date(b.last_comment_at!) - +new Date(a.last_comment_at!))
+  const mostConsidered = [...posts].sort((a, b) => b.considered_score - a.considered_score)
 
   return (
-    <main className="min-h-screen flex items-center justify-center p-6">
-      <div className="max-w-md w-full">
-        <h1 className="text-2xl font-bold mb-3">Pick your handle</h1>
-        <p className="text-sm mb-6">
-          This is how you'll appear on LONGER. Choose carefully — handles
-          aren't changeable. 3–20 characters, lowercase letters, numbers,
-          and underscores only.
-        </p>
-        <div className="flex items-baseline border-b border-black pb-2 mb-2">
-          <span className="text-2xl">@</span>
-          <input
-            autoFocus
-            value={handle}
-            onChange={(e) =>
-              setHandle(e.target.value.replace(/[^a-z0-9_]/gi, '').toLowerCase())
-            }
-            placeholder="your.handle"
-            maxLength={20}
-            className="flex-1 text-2xl bg-transparent outline-none ml-1"
-            onKeyDown={(e) => e.key === 'Enter' && submit()}
-          />
-        </div>
-        {error && <p className="text-sm text-red-700 mb-3">{error}</p>}
-        <button
-          onClick={submit}
-          disabled={!valid || loading}
-          className="w-full border border-black px-4 py-3 mt-4
-                     hover:bg-black hover:text-white transition
-                     disabled:opacity-30 disabled:hover:bg-transparent
-                     disabled:hover:text-black"
-        >
-          {loading ? 'creating...' : 'continue'}
-        </button>
+    <div style={{ maxWidth: 1280, margin: '0 auto', padding: '24px 20px' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20, flexWrap: 'wrap', gap: 12 }}>
+        <pre className="ascii muted" style={{ fontSize: 13 }}>
+{`┌─[ FRONT PAGE ]─────────────────`}
+        </pre>
+        <Link href="/compose" className="btn">▸ NEW</Link>
       </div>
-    </main>
+
+      {scheduled && scheduled.length > 0 && (
+        <div style={{ marginBottom: 24 }}>
+          <p className="smallcaps muted" style={{ fontSize: 12, margin: '0 0 8px' }}>
+            your scheduled
+          </p>
+          {scheduled.map(p => (
+            <div key={p.id} className="scheduled">
+              <div style={{ fontWeight: 600 }}>{p.title}</div>
+              <div className="muted" style={{ fontSize: 12, marginTop: 4 }}>
+                publishes in {timeUntil(p.publish_at)} ·{' '}
+                <Link href={`/compose?edit=${p.id}`} className="link" style={{ fontSize: 12 }}>edit</Link>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {posts.length === 0 && (!scheduled || scheduled.length === 0) && (
+        <div className="panel" style={{ padding: 40, textAlign: 'center', marginTop: 20 }}>
+          <pre className="ascii muted" style={{ fontSize: 11, marginBottom: 14 }}>
+{`╔══════════════════════════╗
+║                          ║
+║     [ NO POSTS YET ]     ║
+║                          ║
+╚══════════════════════════╝`}
+          </pre>
+          <p className="muted">› the page is blank. write the first considered essay.</p>
+        </div>
+      )}
+
+      {posts.length > 0 && (
+        <div style={{
+          display: 'grid',
+          gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))',
+          gap: 16,
+        }}>
+          <Column title="NEWLY POSTED"    posts={newlyPosted} />
+          <Column title="NEWLY DISCUSSED" posts={newlyDiscussed} sortMeta={p => p.last_comment_at ? `last reply ${timeAgo(p.last_comment_at)}` : ''} />
+          <Column title="MOST CONSIDERED" posts={mostConsidered} sortMeta={p => `considered: ${p.considered_score}`} headerHint="↑+(c×3)" />
+        </div>
+      )}
+    </div>
+  )
+}
+
+function Column({
+  title,
+  posts,
+  sortMeta,
+  headerHint,
+}: {
+  title: string
+  posts: FeedPost[]
+  sortMeta?: (p: FeedPost) => string
+  headerHint?: string
+}) {
+  return (
+    <div className="panel">
+      <div className="panel-header">
+        <span>{title}</span>
+        <span className="muted">{headerHint ?? posts.length}</span>
+      </div>
+      <div>
+        {posts.length === 0 ? (
+          <div className="panel-body muted" style={{ fontSize: 12 }}>nothing here yet.</div>
+        ) : (
+          posts.map((p, i) => {
+            const flag = flagByValue(p.editorial_flag)
+            return (
+              <Link key={p.id} href={`/post/${p.id}`} className="post-row">
+                <div className="muted" style={{ fontSize: 12 }}>{String(i + 1).padStart(3, '0')} ▸</div>
+                <div style={{ fontSize: 14, fontWeight: 600, lineHeight: 1.35, margin: '2px 0 4px', textDecoration: p.is_removed ? 'line-through' : 'none', color: p.is_removed ? 'var(--muted)' : 'inherit' }}>
+                  {p.is_removed ? '[removed]' : p.title}
+                  {flag && <span className="flag-badge">{flag.label}</span>}
+                </div>
+                <div className="muted" style={{ fontSize: 11.5 }}>
+                  <span className="accent">@</span>{p.profiles.handle} · {p.word_count} wd · {timeAgo(p.publish_at)}
+                </div>
+                <div className="muted" style={{ fontSize: 11.5, marginTop: 2 }}>
+                  <span className="positive">↑{p.up_count}</span>{' '}
+                  <span className="accent">↓{p.down_count}</span>{' · '}
+                  {p.comment_count} {p.comment_count === 1 ? 'reply' : 'replies'}
+                  {sortMeta && sortMeta(p) && <span> · {sortMeta(p)}</span>}
+                </div>
+              </Link>
+            )
+          })
+        )}
+      </div>
+    </div>
   )
 }

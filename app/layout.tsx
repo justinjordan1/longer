@@ -75,7 +75,7 @@ export default async function RootLayout({
               <span><span className="muted">[comments ≥ 40 words]</span></span>
               <span><span className="muted">[1 comment per hour]</span></span>
               <span><span className="muted">[1 post per day]</span></span>
-              <span><span className="muted">[publish delay 15min]</span></span>
+              <span><span className="muted">[review window 5min · editable]</span></span>
             </div>
           </header>
         )}
