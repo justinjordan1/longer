@@ -25,14 +25,42 @@ export async function middleware(request: NextRequest) {
     }
   )
 
-  // This call refreshes the session if needed
+  // Refresh the session
   const { data: { user } } = await supabase.auth.getUser()
 
   const path = request.nextUrl.pathname
-  const isPublic = path === '/login' || path.startsWith('/auth/')
+  const isPublic     = path === '/login' || path.startsWith('/auth/')
+  const isOnboarding = path === '/onboarding'
 
+  // Not signed in → /login (unless already there or in callback)
   if (!user && !isPublic) {
     return NextResponse.redirect(new URL('/login', request.url))
+  }
+
+  // Signed in but no profile → force /onboarding
+  if (user && !isPublic && !isOnboarding) {
+    const { data: profile } = await supabase
+      .from('profiles')
+      .select('id')
+      .eq('id', user.id)
+      .maybeSingle()
+
+    if (!profile) {
+      return NextResponse.redirect(new URL('/onboarding', request.url))
+    }
+  }
+
+  // Signed in WITH profile but visiting /onboarding → send home
+  if (user && isOnboarding) {
+    const { data: profile } = await supabase
+      .from('profiles')
+      .select('id')
+      .eq('id', user.id)
+      .maybeSingle()
+
+    if (profile) {
+      return NextResponse.redirect(new URL('/', request.url))
+    }
   }
 
   return response
