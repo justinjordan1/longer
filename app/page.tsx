@@ -1,65 +1,151 @@
-import Image from "next/image";
+import { createClient } from '@/lib/supabase/server'
+import Link from 'next/link'
+import { timeAgo, timeUntil, flagByValue } from '@/lib/longer'
 
-export default function Home() {
+type FeedPost = {
+  id: string
+  title: string
+  publish_at: string
+  word_count: number
+  is_removed: boolean
+  editorial_flag: string | null
+  up_count: number
+  down_count: number
+  comment_count: number
+  considered_score: number
+  last_comment_at: string | null
+  profiles: { handle: string }
+}
+
+export default async function FeedPage() {
+  const supabase = await createClient()
+
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return null
+
+  const nowIso = new Date().toISOString()
+
+  // Posts published already (RLS also allows seeing your own scheduled ones,
+  // but for the public columns we filter to published only)
+  const { data: visible } = await supabase
+    .from('posts_with_metrics')
+    .select('id, title, publish_at, word_count, is_removed, editorial_flag, up_count, down_count, comment_count, considered_score, last_comment_at, profiles!inner(handle)')
+    .lte('publish_at', nowIso)
+    .returns<FeedPost[]>()
+
+  // Your own scheduled (not yet published) posts
+  const { data: scheduled } = await supabase
+    .from('posts')
+    .select('id, title, publish_at')
+    .eq('author_id', user.id)
+    .gt('publish_at', nowIso)
+    .order('publish_at', { ascending: true })
+
+  const posts: FeedPost[] = visible || []
+
+  const newlyPosted    = [...posts].sort((a, b) => +new Date(b.publish_at) - +new Date(a.publish_at))
+  const newlyDiscussed = [...posts]
+    .filter(p => p.last_comment_at)
+    .sort((a, b) => +new Date(b.last_comment_at!) - +new Date(a.last_comment_at!))
+  const mostConsidered = [...posts].sort((a, b) => b.considered_score - a.considered_score)
+
   return (
-    <div className="flex flex-col flex-1 items-center justify-center bg-zinc-50 font-sans dark:bg-black">
-      <main className="flex flex-1 w-full max-w-3xl flex-col items-center justify-between py-32 px-16 bg-white dark:bg-black sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={100}
-          height={20}
-          priority
-        />
-        <div className="flex flex-col items-center gap-6 text-center sm:items-start sm:text-left">
-          <h1 className="max-w-xs text-3xl font-semibold leading-10 tracking-tight text-black dark:text-zinc-50">
-            To get started, edit the page.tsx file.
-          </h1>
-          <p className="max-w-md text-lg leading-8 text-zinc-600 dark:text-zinc-400">
-            Looking for a starting point or more instructions? Head over to{" "}
-            <a
-              href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Templates
-            </a>{" "}
-            or the{" "}
-            <a
-              href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Learning
-            </a>{" "}
-            center.
+    <div style={{ maxWidth: 1280, margin: '0 auto', padding: '24px 20px' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20, flexWrap: 'wrap', gap: 12 }}>
+        <pre className="ascii muted" style={{ fontSize: 13 }}>
+{`┌─[ FRONT PAGE ]─────────────────`}
+        </pre>
+        <Link href="/compose" className="btn">▸ NEW</Link>
+      </div>
+
+      {scheduled && scheduled.length > 0 && (
+        <div style={{ marginBottom: 24 }}>
+          <p className="smallcaps muted" style={{ fontSize: 12, margin: '0 0 8px' }}>
+            your scheduled
           </p>
+          {scheduled.map(p => (
+            <div key={p.id} className="scheduled">
+              <div style={{ fontWeight: 600 }}>{p.title}</div>
+              <div className="muted" style={{ fontSize: 12 }}>
+                publishes in {timeUntil(p.publish_at)} · cannot be edited
+              </div>
+            </div>
+          ))}
         </div>
-        <div className="flex flex-col gap-4 text-base font-medium sm:flex-row">
-          <a
-            className="flex h-12 w-full items-center justify-center gap-2 rounded-full bg-foreground px-5 text-background transition-colors hover:bg-[#383838] dark:hover:bg-[#ccc] md:w-[158px]"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={16}
-              height={16}
-            />
-            Deploy Now
-          </a>
-          <a
-            className="flex h-12 w-full items-center justify-center rounded-full border border-solid border-black/[.08] px-5 transition-colors hover:border-transparent hover:bg-black/[.04] dark:border-white/[.145] dark:hover:bg-[#1a1a1a] md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Documentation
-          </a>
+      )}
+
+      {posts.length === 0 && (!scheduled || scheduled.length === 0) && (
+        <div className="panel" style={{ padding: 40, textAlign: 'center', marginTop: 20 }}>
+          <pre className="ascii muted" style={{ fontSize: 11, marginBottom: 14 }}>
+{`╔══════════════════════════╗
+║                          ║
+║     [ NO POSTS YET ]     ║
+║                          ║
+╚══════════════════════════╝`}
+          </pre>
+          <p className="muted">› the page is blank. write the first considered essay.</p>
         </div>
-      </main>
+      )}
+
+      {posts.length > 0 && (
+        <div style={{
+          display: 'grid',
+          gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))',
+          gap: 16,
+        }}>
+          <Column title="NEWLY POSTED"    posts={newlyPosted} />
+          <Column title="NEWLY DISCUSSED" posts={newlyDiscussed} sortMeta={p => p.last_comment_at ? `last reply ${timeAgo(p.last_comment_at)}` : ''} />
+          <Column title="MOST CONSIDERED" posts={mostConsidered} sortMeta={p => `considered: ${p.considered_score}`} headerHint="↑+(c×3)" />
+        </div>
+      )}
     </div>
-  );
+  )
+}
+
+function Column({
+  title,
+  posts,
+  sortMeta,
+  headerHint,
+}: {
+  title: string
+  posts: FeedPost[]
+  sortMeta?: (p: FeedPost) => string
+  headerHint?: string
+}) {
+  return (
+    <div className="panel">
+      <div className="panel-header">
+        <span>{title}</span>
+        <span className="muted">{headerHint ?? posts.length}</span>
+      </div>
+      <div>
+        {posts.length === 0 ? (
+          <div className="panel-body muted" style={{ fontSize: 12 }}>nothing here yet.</div>
+        ) : (
+          posts.map((p, i) => {
+            const flag = flagByValue(p.editorial_flag)
+            return (
+              <Link key={p.id} href={`/post/${p.id}`} className="post-row">
+                <div className="muted" style={{ fontSize: 12 }}>{String(i + 1).padStart(3, '0')} ▸</div>
+                <div style={{ fontSize: 14, fontWeight: 600, lineHeight: 1.35, margin: '2px 0 4px', textDecoration: p.is_removed ? 'line-through' : 'none', color: p.is_removed ? 'var(--muted)' : 'inherit' }}>
+                  {p.is_removed ? '[removed]' : p.title}
+                  {flag && <span className="flag-badge">{flag.label}</span>}
+                </div>
+                <div className="muted" style={{ fontSize: 11.5 }}>
+                  <span className="accent">@</span>{p.profiles.handle} · {p.word_count} wd · {timeAgo(p.publish_at)}
+                </div>
+                <div className="muted" style={{ fontSize: 11.5, marginTop: 2 }}>
+                  <span className="positive">↑{p.up_count}</span>{' '}
+                  <span className="accent">↓{p.down_count}</span>{' · '}
+                  {p.comment_count} {p.comment_count === 1 ? 'reply' : 'replies'}
+                  {sortMeta && sortMeta(p) && <span> · {sortMeta(p)}</span>}
+                </div>
+              </Link>
+            )
+          })
+        )}
+      </div>
+    </div>
+  )
 }
