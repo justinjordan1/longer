@@ -2,7 +2,8 @@
 import { useState, useTransition } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
-import { POST_MIN_WORDS, countWords, timeUntil } from '@/lib/longer'
+import { POST_MIN_WORDS, countWords } from '@/lib/longer'
+import LiveTimeUntil from '@/app/LiveTimeUntil'
 import {
   createPost,
   updateScheduledPost,
@@ -73,7 +74,7 @@ export default function ComposeForm(props: Props) {
           <span>{isEdit ? '┌── EDIT DRAFT ──┐' : '┌── NEW ESSAY ──┐'}</span>
           {isEdit && (
             <span className="muted">
-              publishes in {timeUntil(props.publishAt)}
+              publishes in <LiveTimeUntil iso={props.publishAt} whenPassed="any moment now" />
             </span>
           )}
         </div>
@@ -116,7 +117,7 @@ export default function ComposeForm(props: Props) {
             </div>
             <div style={{ fontSize: 13 }}>
               {isEdit
-                ? <>your essay publishes in {timeUntil(props.publishAt)}. you can keep editing until then. once published, the post is locked.</>
+                ? <>your essay publishes in <LiveTimeUntil iso={props.publishAt} whenPassed="any moment" />. you can keep editing until then. once published, the post is locked.</>
                 : <>once submitted, your essay enters review for 5 minutes. you can edit or discard during that window. one post per 24 hours.</>}
             </div>
           </div>

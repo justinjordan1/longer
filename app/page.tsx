@@ -1,6 +1,7 @@
 import { createClient } from '@/lib/supabase/server'
 import Link from 'next/link'
-import { timeAgo, timeUntil, flagByValue } from '@/lib/longer'
+import { timeAgo, flagByValue } from '@/lib/longer'
+import LiveTimeUntil from './LiveTimeUntil'
 
 type FeedPost = {
   id: string
@@ -66,8 +67,9 @@ export default async function FeedPage() {
           {scheduled.map(p => (
             <div key={p.id} className="scheduled">
               <div style={{ fontWeight: 600 }}>{p.title}</div>
-              <div className="muted" style={{ fontSize: 12 }}>
-                publishes in {timeUntil(p.publish_at)} · cannot be edited
+              <div className="muted" style={{ fontSize: 12, marginTop: 4 }}>
+                publishes in <LiveTimeUntil iso={p.publish_at} whenPassed="any moment now" /> ·{' '}
+                <Link href={`/compose?edit=${p.id}`} className="link" style={{ fontSize: 12 }}>edit</Link>
               </div>
             </div>
           ))}
