@@ -1,5 +1,6 @@
 'use client'
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
+import { useRouter } from 'next/navigation'
 
 function format(ms: number): string {
   if (ms <= 0) return 'any moment'
@@ -16,12 +17,16 @@ function format(ms: number): string {
 export default function LiveTimeUntil({
   iso,
   whenPassed,
+  refreshOnExpire = false,
 }: {
   iso: string
-  whenPassed?: string  // e.g. "publishing now..." or "published"
+  whenPassed?: string
+  refreshOnExpire?: boolean
 }) {
+  const router = useRouter()
   const target = new Date(iso).getTime()
   const [now, setNow] = useState(() => Date.now())
+  const refreshedRef = useRef(false)
 
   useEffect(() => {
     const tick = () => setNow(Date.now())
@@ -29,6 +34,17 @@ export default function LiveTimeUntil({
     const id = setInterval(tick, 1000)
     return () => clearInterval(id)
   }, [])
+
+  // Once-only refresh when timer crosses zero
+  useEffect(() => {
+    if (!refreshOnExpire) return
+    if (refreshedRef.current) return
+    if (now < target) return
+    refreshedRef.current = true
+    // Small delay so any concurrent server-side state transitions have a moment
+    const t = setTimeout(() => router.refresh(), 500)
+    return () => clearTimeout(t)
+  }, [now, target, refreshOnExpire, router])
 
   const diff = target - now
   if (diff <= 0 && whenPassed) return <>{whenPassed}</>

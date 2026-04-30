@@ -137,7 +137,7 @@ export default async function FeedPage({
             <div key={p.id} className="scheduled">
               <div style={{ fontWeight: 600 }}>{p.title}</div>
               <div className="muted" style={{ fontSize: 12, marginTop: 4 }}>
-                publishes in <LiveTimeUntil iso={p.publish_at} whenPassed="any moment now" /> ·{' '}
+                publishes in <LiveTimeUntil iso={p.publish_at} whenPassed="any moment now" refreshOnExpire /> ·{' '}
                 <Link href={`/compose?edit=${p.id}`} className="link" style={{ fontSize: 12 }}>edit</Link>
               </div>
             </div>
