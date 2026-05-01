@@ -173,7 +173,7 @@ input::placeholder, textarea::placeholder {
   font-size: 14.5px;
   line-height: 1.75;
 }
-.essay-prose p { margin: 0 0 1em; }
+.essay-prose p { margin: 0 0 1em; white-space: pre-wrap; }
 
 .comment-block {
   border-left: 2px solid var(--rule);
