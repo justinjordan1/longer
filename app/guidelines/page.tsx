@@ -21,7 +21,7 @@ export default function GuidelinesPage() {
             Be empathetic
           </h2>
           <p style={{ marginTop: 0 }}>
-            There is bigotry of the obvious kind. Overt racism, sexism, clear delineations separating one's tribe from the "other." This is clearly terrible. However, there is a pressing and in some ways more insidious form of bigotry, and that is silent forms of patronization. Statements, say, about the "average American," an imagined strawman removed from their context. Empathy not only across race or gender but across class and circumstance is necessary for genuine discussion.
+            There is bigotry of the obvious kind. Overt racism, sexism, clear delineations separating one's tribe from the "other." This is clearly terrible. However, there is a pressing and in some ways more insidious form of bigotry, and that is silent forms of patronization. Statements, say, about the "average Rural American," an imagined strawman removed from their context. Empathy not only across race or gender but across class and circumstance is necessary for genuine discussion.
           </p>
 
           <div style={{ borderTop: '1px dashed var(--rule)', margin: '28px 0' }} />
