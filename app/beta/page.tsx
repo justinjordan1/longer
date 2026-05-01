@@ -1,8 +1,6 @@
-'use client'
-
-import { useState } from 'react'
-import { useRouter } from 'next/navigation'
-import { createClient } from '@/lib/supabase/client'
+import { redirect } from 'next/navigation'
+import { createClient as createServerSupabase } from '@/lib/supabase/server'
+import { createClient as createAdminClient } from '@supabase/supabase-js'
 
 const CREDENTIALS: Record<string, { password: string; email: string }> = {
   rowan: { password: 'rowan', email: 'beta+rowan@longerwords.com' },
@@ -10,80 +8,115 @@ const CREDENTIALS: Record<string, { password: string; email: string }> = {
   racecar: { password: 'racecar', email: 'beta+racecar@longerwords.com' },
 }
 
-export default function BetaPage() {
-  const [username, setUsername] = useState('')
-  const [password, setPassword] = useState('')
-  const [loading, setLoading] = useState(false)
-  const [error, setError] = useState('')
-  const router = useRouter()
-  const supabase = createClient()
+async function betaLogin(formData: FormData) {
+  'use server'
 
-  const submit = async () => {
-    if (loading) return
+  const username = String(formData.get('username') ?? '').trim().toLowerCase()
+  const password = String(formData.get('password') ?? '')
+  const match = CREDENTIALS[username]
 
-    const normalized = username.trim().toLowerCase()
-    const match = CREDENTIALS[normalized]
+  if (!match || match.password !== password) {
+    redirect('/beta?error=invalid')
+  }
 
-    if (!match || match.password !== password) {
-      setError('invalid beta credentials')
-      return
-    }
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL
+  const serviceRole = process.env.SUPABASE_SERVICE_ROLE_KEY
 
-    setLoading(true)
-    setError('')
+  if (!url || !serviceRole) {
+    redirect('/beta?error=missing-server-config')
+  }
 
-    const trySignIn = await supabase.auth.signInWithPassword({
+  const admin = createAdminClient(url, serviceRole, {
+    auth: { autoRefreshToken: false, persistSession: false },
+  })
+
+  const list = await admin.auth.admin.listUsers()
+  if (list.error) {
+    redirect('/beta?error=admin-list-failed')
+  }
+
+  const existing = list.data.users.find((u) => u.email?.toLowerCase() === match.email)
+
+  if (!existing) {
+    const created = await admin.auth.admin.createUser({
       email: match.email,
+      password,
+      email_confirm: true,
+    })
+
+    if (created.error) {
+      redirect('/beta?error=admin-create-failed')
+    }
+  } else if (!existing.email_confirmed_at) {
+    const updated = await admin.auth.admin.updateUserById(existing.id, {
+      email_confirm: true,
       password,
     })
 
-    if (trySignIn.error) {
-      if (trySignIn.error.message.toLowerCase().includes('email not confirmed')) {
-        setError('beta account exists but is not confirmed in Supabase auth yet.')
-      } else if (trySignIn.error.message.toLowerCase().includes('invalid login credentials')) {
-        setError('beta account has not been created in Supabase auth yet.')
-      } else {
-        setError(trySignIn.error.message)
-      }
-      setLoading(false)
-      return
+    if (updated.error) {
+      redirect('/beta?error=admin-confirm-failed')
     }
-
-    router.push('/onboarding')
-    router.refresh()
   }
+
+  const supabase = await createServerSupabase()
+  const signedIn = await supabase.auth.signInWithPassword({
+    email: match.email,
+    password,
+  })
+
+  if (signedIn.error) {
+    redirect('/beta?error=signin-failed')
+  }
+
+  redirect('/onboarding')
+}
+
+function errorMessage(code?: string) {
+  switch (code) {
+    case 'invalid':
+      return 'invalid beta credentials'
+    case 'missing-server-config':
+      return 'missing server config: SUPABASE_SERVICE_ROLE_KEY'
+    case 'admin-list-failed':
+      return 'unable to read beta users from Supabase'
+    case 'admin-create-failed':
+      return 'unable to create beta account in Supabase'
+    case 'admin-confirm-failed':
+      return 'unable to confirm beta account in Supabase'
+    case 'signin-failed':
+      return 'beta account exists but sign-in failed'
+    default:
+      return ''
+  }
+}
+
+export default async function BetaPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ error?: string }>
+}) {
+  const params = await searchParams
+  const message = errorMessage(params.error)
 
   return (
     <main className="min-h-screen flex items-center justify-center p-6">
       <div className="max-w-md w-full">
         <h1 className="text-3xl font-bold mb-2">LONGER BETA</h1>
-        <p className="mb-8 text-sm">private beta access (pre-created accounts only)</p>
+        <p className="mb-8 text-sm">private beta access</p>
 
-        <div className="space-y-3">
-          <input
-            className="w-full border border-black px-4 py-3"
-            placeholder="username"
-            value={username}
-            onChange={(e) => setUsername(e.target.value)}
-            onKeyDown={(e) => e.key === 'Enter' && submit()}
-          />
+        <form action={betaLogin} className="space-y-3">
+          <input className="w-full border border-black px-4 py-3" placeholder="username" name="username" />
           <input
             className="w-full border border-black px-4 py-3"
             placeholder="password"
+            name="password"
             type="password"
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            onKeyDown={(e) => e.key === 'Enter' && submit()}
           />
-          {error && <p className="text-sm text-red-600">{error}</p>}
-          <button
-            onClick={submit}
-            className="w-full border border-black px-4 py-3 hover:bg-black hover:text-white transition"
-            disabled={loading}
-          >
-            {loading ? 'signing in...' : 'continue'}
+          {message && <p className="text-sm text-red-600">{message}</p>}
+          <button className="w-full border border-black px-4 py-3 hover:bg-black hover:text-white transition">
+            continue
           </button>
-        </div>
+        </form>
       </div>
     </main>
   )
