@@ -74,7 +74,7 @@ export default async function RootLayout({
               </div>
             </div>
             <div className="status-bar">
-              <span><span className="muted">[posts ≥ 500 words]</span></span>
+              <span><span className="muted">[posts ≥ 300 words]</span></span>
               <span><span className="muted">[comments ≥ 40 words]</span></span>
               <span><span className="muted">[1 comment per hour]</span></span>
               <span><span className="muted">[1 post per day]</span></span>

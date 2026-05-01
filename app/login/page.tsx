@@ -21,7 +21,7 @@ export default function LoginPage() {
         <h1 className="text-3xl font-bold mb-2">LONGER</h1>
         <p className="mb-8 text-sm">
           A place for some longer thoughts I guess. Posts must run at least
-          500 words. Comments at least 40.
+          300 words. Comments at least 40.
         </p>
         <button
           onClick={signIn}
