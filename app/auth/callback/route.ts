@@ -15,19 +15,22 @@ export async function GET(request: NextRequest) {
     return NextResponse.redirect(`${origin}/login?error=${exchangeError.message}`)
   }
 
-  const { data: { user } } = await supabase.auth.getUser()
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
   if (!user) {
     return NextResponse.redirect(`${origin}/login?error=no-user`)
   }
 
-  // Defense in depth — even though the Azure tenant URL restricts to GT,
-  // verify the email domain server-side too.
-  if (!user.email?.toLowerCase().endsWith('@gatech.edu')) {
+  const email = user.email?.toLowerCase()
+  const isAllowedEmail =
+    email?.endsWith('@gatech.edu') || email?.endsWith('@emory.edu')
+
+  if (!isAllowedEmail) {
     await supabase.auth.signOut()
-    return NextResponse.redirect(`${origin}/login?error=non-gatech-email`)
+    return NextResponse.redirect(`${origin}/login?error=non-allowed-email`)
   }
 
-  // First-time users have no profile row yet; send to onboarding.
   const { data: profile } = await supabase
     .from('profiles')
     .select('handle')
@@ -38,7 +41,6 @@ export async function GET(request: NextRequest) {
     return NextResponse.redirect(`${origin}/onboarding`)
   }
 
-  // Returning user — bump their last_signin_at and send home.
   await supabase
     .from('profiles')
     .update({ last_signin_at: new Date().toISOString() })
