@@ -1,5 +1,5 @@
 'use client'
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 
@@ -7,10 +7,21 @@ export default function OnboardingPage() {
   const [handle, setHandle] = useState('')
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
+  const [isBetaAccount, setIsBetaAccount] = useState(false)
   const router = useRouter()
   const supabase = createClient()
 
   const valid = /^[a-z0-9_]{3,20}$/.test(handle)
+
+
+  useEffect(() => {
+    const checkUser = async () => {
+      const { data: { user } } = await supabase.auth.getUser()
+      const email = user?.email?.toLowerCase() ?? ''
+      setIsBetaAccount(email.startsWith('beta+') && email.endsWith('@longerwords.com'))
+    }
+    void checkUser()
+  }, [supabase.auth])
 
   const submit = async () => {
     if (!valid || loading) return
@@ -50,11 +61,18 @@ export default function OnboardingPage() {
         </div>
         <div className="panel-body" style={{ padding: 24 }}>
           <p style={{ margin: '0 0 18px', lineHeight: 1.7 }}>
-            <span className="muted">›</span> this is how you'll appear on LONGER.
+            <span className="muted">›</span> this is how you&apos;ll appear on LONGER.
           </p>
           <p style={{ margin: '0 0 24px', lineHeight: 1.7 }}>
-            <span className="muted">›</span> choose carefully. handles aren't changeable. 3–20 characters, lowercase letters, numbers, and underscores only.
+            <span className="muted">›</span> choose carefully. handles aren&apos;t changeable. 3–20 characters, lowercase letters, numbers, and underscores only.
           </p>
+
+
+          {isBetaAccount && (
+            <p className="accent" style={{ margin: '0 0 18px', lineHeight: 1.7 }}>
+              <span className="muted">›</span> beta account detected.
+            </p>
+          )}
 
           <div style={{ borderTop: '1px dashed var(--rule)', paddingTop: 22 }}>
             <p className="smallcaps muted" style={{ fontSize: 12, margin: '0 0 8px' }}>handle</p>

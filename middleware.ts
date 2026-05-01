@@ -29,7 +29,11 @@ export async function middleware(request: NextRequest) {
   const path = request.nextUrl.pathname
 
   // Public routes — login page and the OAuth callback chain
-  const isPublic = path === '/login' || path === '/guidelines' || path.startsWith('/auth/')
+  const isPublic =
+    path === '/login' ||
+    path === '/guidelines' ||
+    path === '/beta' ||
+    path.startsWith('/auth/')
 
   // Not signed in: only public routes are reachable
   if (!user) {
