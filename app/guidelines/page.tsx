@@ -24,6 +24,8 @@ export default function GuidelinesPage() {
           <p style={{ marginTop: 0 }}>
             Short stories, essays, poems, book reviews, rants about life, rants about a theoretical life, plans, failures, or whatever else is on the dome
           </p>
+
+          <div style={{ borderTop: '1px dashed var(--rule)', margin: '28px 0' }} />
           
           <h2 style={{ fontSize: 16, fontWeight: 700, marginTop: 0, marginBottom: 10 }}>
             Be empathetic
