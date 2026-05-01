@@ -42,7 +42,7 @@ export default function GuidelinesPage() {
             No slop, please
           </h2>
           <p style={{ marginTop: 0, marginBottom: 0 }}>
-            Really hard to enforce, but c'mon, y'all. AI detectors are mathematically useless, so don't rely on them, but if you believe something to be AI you can report it as such. Moderation will probably not remove the post, as even slop can create good discussion in the comments, but if it's especially egregious it will be taken down.
+            Really hard to enforce but cmon yall. AI detectors are mathematically useless, so don't rely on them, but if you believe something to be AI you can report it as such. Moderation will probably not remove the post, as even slop can create good discussion in the comments, but if it's especially egregious it will be taken down.
           </p>
         </div>
       </div>
