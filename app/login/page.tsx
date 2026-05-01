@@ -2,14 +2,12 @@
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
 
-type Provider = 'azure' | 'custom:emory'
-
 export default function LoginPage() {
   const supabase = createClient()
 
-  const signIn = async (provider: Provider) => {
+  const signIn = async () => {
     await supabase.auth.signInWithOAuth({
-      provider,
+      provider: 'azure',
       options: {
         scopes: 'email openid profile',
         redirectTo: `${window.location.origin}/auth/callback`,
@@ -25,26 +23,17 @@ export default function LoginPage() {
           A place for some longer thoughts I guess. Posts must run at least
           300 words. Comments at least 40.
         </p>
-        <div className="space-y-3">
-          <button
-            onClick={() => signIn('azure')}
-            className="w-full border border-black px-4 py-3 hover:bg-black hover:text-white transition"
-          >
-            Continue with Georgia Tech
-          </button>
-          <button
-            onClick={() => signIn('custom:emory')}
-            className="w-full border border-black px-4 py-3 hover:bg-black hover:text-white transition"
-          >
-            Continue with Emory
-          </button>
-        </div>
+        <button
+          onClick={signIn}
+          className="w-full border border-black px-4 py-3 hover:bg-black hover:text-white transition"
+        >
+          Sign in with Georgia Tech account
+        </button>
         <p className="text-xs mt-6 opacity-60">
-          You&apos;ll be redirected to Microsoft to verify your school identity.{' '}
+          You'll be redirected to Microsoft to verify your @gatech.edu identity.{' '}
           <Link href="/guidelines" style={{ textDecoration: 'underline' }}>
             read the guidelines first
-          </Link>
-          .
+          </Link>.
         </p>
       </div>
     </main>
