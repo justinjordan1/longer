@@ -1,6 +1,4 @@
-<pre>
-┌── NEW ON CAMPUS ───┐                                      vol. i
-</pre>
+
 
 <p align="center">
   <img src="./public/longer-oauth-icon.svg" width="96" alt="LONGER mark" />
@@ -26,7 +24,4 @@ the dome.
 
 Built with Next.js on Node.js, Supabase, and Vercel.
 
-<pre>
-────────────────────────────────────────────────────────────
-                           est. 2026
-</pre>
+
