@@ -151,13 +151,7 @@ export async function markLetterRead(letterId: string) {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return { error: 'not authenticated' }
 
-  const { error } = await supabase
-    .from('letters')
-    .update({ read_at: new Date().toISOString() })
-    .eq('id', letterId)
-    .eq('recipient_id', user.id)
-    .is('read_at', null)
-
+  const { error } = await supabase.rpc('mark_letter_read', { p_letter_id: letterId })
   if (error) return { error: error.message }
 
   revalidatePath('/mailroom')
@@ -170,27 +164,7 @@ export async function deleteLetterFromInbox(letterId: string) {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return { error: 'not authenticated' }
 
-  const nowIso = new Date().toISOString()
-  const { data: letter } = await supabase
-    .from('letters')
-    .select('id, sender_id, recipient_id')
-    .eq('id', letterId)
-    .maybeSingle()
-
-  if (!letter) return { error: 'letter not found' }
-
-  const column =
-    letter.recipient_id === user.id ? 'recipient_deleted_at'
-    : letter.sender_id === user.id  ? 'sender_deleted_at'
-    : null
-
-  if (!column) return { error: 'not your letter' }
-
-  const { error } = await supabase
-    .from('letters')
-    .update({ [column]: nowIso })
-    .eq('id', letterId)
-
+  const { error } = await supabase.rpc('soft_delete_letter', { p_letter_id: letterId })
   if (error) return { error: error.message }
 
   revalidatePath('/mailroom')
