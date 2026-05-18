@@ -32,11 +32,17 @@ export default async function RootLayout({
     profile = data
 
     if (profile?.is_mod) {
-      const { count } = await supabase
-        .from('reports')
-        .select('*', { count: 'exact', head: true })
-        .is('dismissed_at', null)
-      openReports = count ?? 0
+      const [postReportsRes, letterReportsRes] = await Promise.all([
+        supabase
+          .from('reports')
+          .select('*', { count: 'exact', head: true })
+          .is('dismissed_at', null),
+        supabase
+          .from('letter_reports')
+          .select('*', { count: 'exact', head: true })
+          .is('dismissed_at', null),
+      ])
+      openReports = (postReportsRes.count ?? 0) + (letterReportsRes.count ?? 0)
     }
   }
 

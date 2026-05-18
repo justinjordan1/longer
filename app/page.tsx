@@ -122,9 +122,10 @@ export default async function FeedPage({
   let favoriteCount = 0
   let drafts: DraftStub[] = []
   let scheduled: ScheduledPost[] = []
+  let unreadLetters = 0
 
   if (user) {
-    const [profileRes, favoritesRes, draftsRes, scheduledRes] = await Promise.all([
+    const [profileRes, favoritesRes, draftsRes, scheduledRes, unreadRes] = await Promise.all([
       supabase
         .from('profiles')
         .select('handle, dismissed_favorites_prompt, dismissed_intro_banner')
@@ -145,12 +146,19 @@ export default async function FeedPage({
         .eq('author_id', user.id)
         .gt('publish_at', nowIso)
         .order('publish_at', { ascending: true }),
+      supabase
+        .from('letters')
+        .select('*', { count: 'exact', head: true })
+        .eq('recipient_id', user.id)
+        .is('read_at', null)
+        .is('recipient_deleted_at', null),
     ])
 
     profile = profileRes.data as ProfilePromptRow | null
     favoriteCount = favoritesRes.count ?? 0
     drafts = (draftsRes.data ?? []) as DraftStub[]
     scheduled = (scheduledRes.data ?? []) as ScheduledPost[]
+    unreadLetters = unreadRes.count ?? 0
   }
 
   const shouldShowFavoritesPrompt =
@@ -234,7 +242,7 @@ export default async function FeedPage({
       )}
 
       {user ? (
-        <DraftsToggle drafts={drafts} />
+        <DraftsToggle drafts={drafts} unreadLetters={unreadLetters} />
       ) : (
         <GuestNewPrompt />
       )}

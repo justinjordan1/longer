@@ -11,7 +11,7 @@ export type DraftStub = {
   updated_at: string
 }
 
-export default function DraftsToggle({ drafts }: { drafts: DraftStub[] }) {
+export default function DraftsToggle({ drafts, unreadLetters = 0 }: { drafts: DraftStub[]; unreadLetters?: number }) {
   const [open, setOpen] = useState(false)
 
   return (
@@ -30,6 +30,20 @@ export default function DraftsToggle({ drafts }: { drafts: DraftStub[] }) {
               {open ? 'Hide Drafts' : `Drafts · ${drafts.length}`}
             </button>
           )}
+          <Link href="/mailroom" className="btn btn-ghost">
+            ▸ MAILROOM
+            {unreadLetters > 0 && (
+              <span style={{
+                marginLeft: 8,
+                display: 'inline-block',
+                background: 'var(--accent)', color: 'var(--paper)',
+                padding: '0 6px', fontSize: 11, fontWeight: 700,
+                letterSpacing: '0.04em',
+              }}>
+                {unreadLetters}
+              </span>
+            )}
+          </Link>
           <Link href="/compose" className="btn">▸ NEW</Link>
         </div>
       </div>

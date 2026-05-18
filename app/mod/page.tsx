@@ -12,6 +12,23 @@ type ReportRow = {
   profiles: ProfileRelation
 }
 
+type LetterReportRow = {
+  id: string
+  letter_id: string
+  kind: 'hateful' | 'spam' | 'other'
+  created_at: string
+  profiles: ProfileRelation
+}
+
+type LetterRowForMod = {
+  id: string
+  title: string
+  body: string
+  created_at: string
+  sender:    ProfileRelation
+  recipient: ProfileRelation
+}
+
 type ModPostRow = {
   id: string
   title: string
@@ -63,6 +80,32 @@ export default async function ModConsolePage() {
         .select('id, title, publish_at, is_removed, editorial_flag, profiles:author_id(handle)')
         .in('id', reportedPostIds)
     : { data: [] }
+
+  const { data: letterReportsRaw } = await supabase
+    .from('letter_reports')
+    .select('id, letter_id, kind, created_at, profiles:reporter_id(handle)')
+    .is('dismissed_at', null)
+    .order('created_at', { ascending: false })
+
+  const letterReports = (letterReportsRaw ?? []) as LetterReportRow[]
+  const reportedLetterIds = Array.from(new Set(letterReports.map(r => r.letter_id)))
+  const { data: reportedLettersRaw } = reportedLetterIds.length > 0
+    ? await supabase
+        .from('letters')
+        .select('id, title, body, created_at, sender:sender_id(handle), recipient:recipient_id(handle)')
+        .in('id', reportedLetterIds)
+    : { data: [] }
+
+  const lettersById = new Map<string, LetterRowForMod>()
+  for (const l of (reportedLettersRaw ?? []) as LetterRowForMod[]) {
+    lettersById.set(l.id, l)
+  }
+
+  const reportsByLetter = new Map<string, LetterReportRow[]>()
+  for (const r of letterReports) {
+    if (!reportsByLetter.has(r.letter_id)) reportsByLetter.set(r.letter_id, [])
+    reportsByLetter.get(r.letter_id)!.push(r)
+  }
 
   const { data: recent } = await supabase
     .from('posts_with_metrics')
@@ -135,6 +178,46 @@ export default async function ModConsolePage() {
                     <ModRowActions postId={p.id} action="dismiss" kind="ai" />
                   </div>
                 )}
+              </div>
+            )
+          })}
+        </div>
+      </div>
+
+      <div className="panel" style={{ marginBottom: 24 }}>
+        <div className="panel-header">
+          <span>LETTER REPORTS</span>
+          <span className="muted">{reportsByLetter.size}</span>
+        </div>
+        <div>
+          {reportsByLetter.size === 0 && (
+            <div className="panel-body muted" style={{ fontSize: 13, fontStyle: 'italic' }}>
+              › no reported letters.
+            </div>
+          )}
+          {Array.from(reportsByLetter.entries()).map(([letterId, reps]) => {
+            const letter = lettersById.get(letterId)
+            if (!letter) return null
+            const sender = profileHandle(letter.sender)
+            const recipient = profileHandle(letter.recipient)
+            return (
+              <div key={letterId} style={{ borderTop: '1px dashed var(--rule)', padding: 14 }}>
+                <div className="muted" style={{ fontSize: 11.5, marginBottom: 4 }}>
+                  <span className="accent">@</span>{sender} → <span className="accent">@</span>{recipient}
+                  {' · '}{timeAgo(letter.created_at)} ago
+                </div>
+                <div style={{ fontWeight: 600, fontSize: 14, marginBottom: 4 }}>
+                  {letter.title || <span className="muted">[untitled letter]</span>}
+                </div>
+                <div className="muted" style={{ fontSize: 12, lineHeight: 1.5, whiteSpace: 'pre-wrap', marginBottom: 8, maxHeight: 160, overflow: 'auto' }}>
+                  {letter.body}
+                </div>
+                <div style={{ fontSize: 12 }}>
+                  <span className="accent">! reports ({reps.length}):</span>{' '}
+                  <span className="muted">
+                    {reps.map(r => `@${profileHandle(r.profiles)} (${r.kind})`).join(', ')}
+                  </span>
+                </div>
               </div>
             )
           })}
