@@ -119,7 +119,8 @@ export default function InboxList({
                 style={{
                   display: 'block', width: '100%', textAlign: 'left',
                   background: unread ? 'rgba(139, 38, 53, 0.05)' : 'transparent',
-                  border: 0, font: 'inherit', cursor: 'pointer',
+                  borderLeft: 0, borderRight: 0, borderBottom: 0,
+                  font: 'inherit', cursor: 'pointer',
                 }}
               >
                 <div className="muted" style={{ fontSize: 12 }}>
@@ -152,21 +153,29 @@ export default function InboxList({
           style={{
             position: 'fixed', inset: 0, zIndex: 50,
             background: 'rgba(42, 31, 18, 0.55)',
-            display: 'flex', alignItems: 'flex-start', justifyContent: 'center',
-            padding: '40px 16px',
-            overflowY: 'auto',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            padding: '24px 16px',
           }}
         >
           <div
             className="panel"
             onClick={e => e.stopPropagation()}
-            style={{ maxWidth: 640, width: '100%', background: 'var(--paper)' }}
+            style={{
+              maxWidth: 640,
+              width: '100%',
+              maxHeight: 'calc(100vh - 48px)',
+              background: 'var(--paper)',
+              display: 'flex',
+              flexDirection: 'column',
+              overflow: 'hidden',
+            }}
           >
-            <div className="panel-header">
+            <div className="panel-header" style={{ flex: '0 0 auto' }}>
               <span>┌── LETTER ──┐</span>
               <button onClick={onClose} className="link" style={{ fontSize: 12 }}>[close]</button>
             </div>
-            <div className="panel-body" style={{ padding: 20 }}>
+
+            <div style={{ flex: '1 1 auto', overflowY: 'auto', padding: 20 }}>
               <div className="muted" style={{ fontSize: 12, marginBottom: 6 }}>
                 {reading.direction === 'incoming' ? 'from' : 'to'}{' '}
                 <Link href={`/u/${reading.other_handle}`} className="link">
@@ -181,14 +190,22 @@ export default function InboxList({
               <div className="essay-prose" style={{ whiteSpace: 'pre-wrap' }}>
                 {reading.body}
               </div>
+            </div>
 
+            <div
+              style={{
+                flex: '0 0 auto',
+                borderTop: '1px dashed var(--rule)',
+                padding: '12px 16px',
+                background: 'var(--paper)',
+              }}
+            >
               {error && (
-                <p className={error.startsWith('reported') ? 'positive' : 'accent'} style={{ fontSize: 12, marginTop: 14 }}>
+                <p className={error.startsWith('reported') ? 'positive' : 'accent'} style={{ fontSize: 12, margin: '0 0 10px' }}>
                   {error.startsWith('reported') ? '✓' : '!'} {error}
                 </p>
               )}
-
-              <div style={{ display: 'flex', gap: 8, justifyContent: 'space-between', flexWrap: 'wrap', marginTop: 18 }}>
+              <div style={{ display: 'flex', gap: 8, justifyContent: 'space-between', flexWrap: 'wrap' }}>
                 <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
                   {reading.direction === 'incoming' && (
                     <>
