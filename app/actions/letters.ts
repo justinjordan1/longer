@@ -2,7 +2,7 @@
 import { createClient } from '@/lib/supabase/server'
 import { revalidatePath } from 'next/cache'
 import { redirect } from 'next/navigation'
-import { countWords } from '@/lib/longer'
+import { LETTER_MIN_WORDS, countWords } from '@/lib/longer'
 
 type LetterReportKind = 'hateful' | 'spam' | 'other'
 
@@ -10,7 +10,17 @@ function readLetterForm(formData: FormData) {
   const recipient = String(formData.get('recipient') || '').trim().replace(/^@/, '')
   const title = String(formData.get('title') || '').trim()
   const body  = String(formData.get('body')  || '').trim()
-  return { recipient, title, body, wordCount: countWords(body) }
+  const replyToRaw = String(formData.get('reply_to') || '').trim()
+  const replyTo = replyToRaw || null
+  return { recipient, title, body, wordCount: countWords(body), replyTo }
+}
+
+async function resolveRecipient(supabase: Awaited<ReturnType<typeof createClient>>, handle: string) {
+  return supabase
+    .from('profiles')
+    .select('id, handle')
+    .ilike('handle', handle)
+    .maybeSingle()
 }
 
 export async function sendLetter(formData: FormData) {
@@ -18,17 +28,18 @@ export async function sendLetter(formData: FormData) {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return { error: 'not authenticated' }
 
+  const draftIdRaw = String(formData.get('draft_id') || '').trim()
+  const draftId = draftIdRaw || null
+
   const { recipient, title, body, wordCount } = readLetterForm(formData)
 
   if (!recipient) return { error: 'recipient handle required' }
   if (title.length > 200) return { error: 'title max 200 chars' }
-  if (!body) return { error: 'write something before sending' }
+  if (wordCount < LETTER_MIN_WORDS) {
+    return { error: `${LETTER_MIN_WORDS - wordCount} more words needed` }
+  }
 
-  const { data: recipientProfile } = await supabase
-    .from('profiles')
-    .select('id, handle')
-    .ilike('handle', recipient)
-    .maybeSingle()
+  const { data: recipientProfile } = await resolveRecipient(supabase, recipient)
 
   if (!recipientProfile) return { error: `no such user @${recipient}` }
   if (recipientProfile.id === user.id) return { error: 'you cannot send a letter to yourself' }
@@ -51,9 +62,88 @@ export async function sendLetter(formData: FormData) {
     return { error: error.message }
   }
 
+  if (draftId) {
+    await supabase
+      .from('letter_drafts')
+      .delete()
+      .eq('id', draftId)
+      .eq('author_id', user.id)
+  }
+
   revalidatePath('/mailroom')
   revalidatePath('/')
   redirect('/mailroom?sent=1')
+}
+
+export async function saveLetterDraft(draftId: string | null, formData: FormData) {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return { error: 'not authenticated' }
+
+  const { recipient, title, body, wordCount, replyTo } = readLetterForm(formData)
+  if (title.length > 200) return { error: 'title max 200 chars' }
+  if (!recipient && !title && !body) return { error: 'write something before saving' }
+
+  if (draftId) {
+    const { data: existing } = await supabase
+      .from('letter_drafts')
+      .select('id, author_id')
+      .eq('id', draftId)
+      .maybeSingle()
+    if (!existing) return { error: 'draft not found' }
+    if (existing.author_id !== user.id) return { error: 'not your draft' }
+
+    const { error } = await supabase
+      .from('letter_drafts')
+      .update({
+        recipient_handle: recipient,
+        title,
+        body,
+        word_count: wordCount,
+        reply_to_letter_id: replyTo,
+        updated_at: new Date().toISOString(),
+      })
+      .eq('id', draftId)
+      .eq('author_id', user.id)
+    if (error) return { error: error.message }
+
+    revalidatePath('/mailroom')
+    return { success: true, draftId }
+  }
+
+  const { data, error } = await supabase
+    .from('letter_drafts')
+    .insert({
+      author_id: user.id,
+      recipient_handle: recipient,
+      title,
+      body,
+      word_count: wordCount,
+      reply_to_letter_id: replyTo,
+    })
+    .select('id')
+    .single()
+
+  if (error) return { error: error.message }
+
+  revalidatePath('/mailroom')
+  return { success: true, draftId: data.id as string }
+}
+
+export async function discardLetterDraft(draftId: string) {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return { error: 'not authenticated' }
+
+  const { error } = await supabase
+    .from('letter_drafts')
+    .delete()
+    .eq('id', draftId)
+    .eq('author_id', user.id)
+
+  if (error) return { error: error.message }
+  revalidatePath('/mailroom')
+  return { success: true }
 }
 
 export async function markLetterRead(letterId: string) {
@@ -115,11 +205,7 @@ export async function blockSender(senderHandle: string) {
   const handle = senderHandle.trim().replace(/^@/, '')
   if (!handle) return { error: 'handle required' }
 
-  const { data: target } = await supabase
-    .from('profiles')
-    .select('id, handle')
-    .ilike('handle', handle)
-    .maybeSingle()
+  const { data: target } = await resolveRecipient(supabase, handle)
 
   if (!target) return { error: `no such user @${handle}` }
   if (target.id === user.id) return { error: 'you cannot block yourself' }

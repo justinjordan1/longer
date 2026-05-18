@@ -1,5 +1,6 @@
 export const POST_MIN_WORDS = 300
 export const COMMENT_MIN_WORDS = 40
+export const LETTER_MIN_WORDS = 100
 
 export const FLAG_PRESETS = [
   {

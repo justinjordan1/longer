@@ -3,6 +3,7 @@ import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
 import InboxList, { type LetterStub } from './InboxList'
 import BlockList, { type BlockedStub } from './BlockList'
+import LetterDraftsToggle, { type LetterDraftStub } from './LetterDraftsToggle'
 
 type ProfileRel = { id: string; handle: string } | { id: string; handle: string }[] | null
 
@@ -65,6 +66,12 @@ export default async function MailroomPage({
     .eq('blocker_id', user.id)
     .order('created_at', { ascending: false })
 
+  const draftsRes = await supabase
+    .from('letter_drafts')
+    .select('id, recipient_handle, title, body, word_count, updated_at')
+    .eq('author_id', user.id)
+    .order('updated_at', { ascending: false })
+
   const incoming: LetterStub[] = ((incomingRes.data ?? []) as LetterRow[]).map(r => {
     const sender = flattenProfile(r.sender)
     return {
@@ -104,6 +111,8 @@ export default async function MailroomPage({
     }
   })
 
+  const drafts: LetterDraftStub[] = (draftsRes.data ?? []) as LetterDraftStub[]
+
   const letters = box === 'sent' ? sent : incoming
   const unread = incoming.filter(l => !l.read_at).length
 
@@ -119,6 +128,8 @@ export default async function MailroomPage({
         </pre>
         <Link href="/mailroom/new" className="btn">▸ NEW LETTER</Link>
       </div>
+
+      <LetterDraftsToggle drafts={drafts} />
 
       {justSent && (
         <div className="scheduled" style={{ marginBottom: 16 }}>
@@ -149,7 +160,7 @@ export default async function MailroomPage({
       <BlockList blocked={blocked} />
 
       <p className="muted" style={{ fontSize: 11.5, marginTop: 22, lineHeight: 1.6 }}>
-        › letters are private. max 3 letters per day to the same person. mods can review reported letters.
+        › letters are private. minimum 100 words, max 3 letters per day to the same person. mods can review reported letters.
       </p>
     </div>
   )

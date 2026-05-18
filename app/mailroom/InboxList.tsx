@@ -193,7 +193,7 @@ export default function InboxList({
                   {reading.direction === 'incoming' && (
                     <>
                       <Link
-                        href={`/mailroom/new?to=${encodeURIComponent(reading.other_handle)}`}
+                        href={`/mailroom/new?reply=${reading.id}`}
                         className="btn btn-ghost"
                       >
                         ▸ write back
