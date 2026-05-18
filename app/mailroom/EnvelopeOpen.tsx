@@ -116,12 +116,14 @@ function OpenEnvelope() {
       {/* letter peeking out (brown, behind envelope) */}
       <g fill="var(--ink-soft)">
         {/* triangular letter pointing up */}
-        <rect x="11" y="5"  width="2" height="1" />
-        <rect x="10" y="6"  width="4" height="1" />
-        <rect x="9"  y="7"  width="6" height="1" />
-        <rect x="8"  y="8"  width="8" height="1" />
-        <rect x="7"  y="9"  width="10" height="1" />
-        <rect x="6"  y="10" width="12" height="1" />
+        <rect x="11" y="3"  width="2" height="1" />
+        <rect x="10" y="4"  width="4" height="1" />
+        <rect x="9"  y="5"  width="6" height="1" />
+        <rect x="8"  y="6"  width="8" height="1" />
+        <rect x="7"  y="7"  width="10" height="1" />
+        <rect x="6"  y="8"  width="12" height="1" />
+        <rect x="5"  y="9"  width="14" height="1" />
+        <rect x="5"  y="10" width="14" height="1" />
         <rect x="5"  y="11" width="14" height="1" />
         {/* letter base fills into envelope opening */}
         <rect x="5"  y="12" width="14" height="2" />
@@ -137,20 +139,24 @@ function OpenEnvelope() {
         {/* right edge */}
         <rect x="20" y="11" width="1"  height="8" />
         {/* open flap — diagonals pointing OUTWARD from top of body */}
-        {/* left diagonal: (3,11) -> (11,5)... going up & inward */}
+        {/* left diagonal: (3,11) -> (11,3)... going up & inward */}
         <rect x="4"  y="10" width="1" height="1" />
         <rect x="5"  y="9"  width="1" height="1" />
         <rect x="6"  y="8"  width="1" height="1" />
         <rect x="7"  y="7"  width="1" height="1" />
         <rect x="8"  y="6"  width="1" height="1" />
         <rect x="9"  y="5"  width="1" height="1" />
-        {/* right diagonal: (20,11) -> (12,5) */}
+        <rect x="10" y="4"  width="1" height="1" />
+        <rect x="11" y="3"  width="1" height="1" />
+        {/* right diagonal: (20,11) -> (12,3) */}
         <rect x="19" y="10" width="1" height="1" />
         <rect x="18" y="9"  width="1" height="1" />
         <rect x="17" y="8"  width="1" height="1" />
         <rect x="16" y="7"  width="1" height="1" />
         <rect x="15" y="6"  width="1" height="1" />
         <rect x="14" y="5"  width="1" height="1" />
+        <rect x="13" y="4"  width="1" height="1" />
+        <rect x="12" y="3"  width="1" height="1" />
       </g>
     </>
   )
