@@ -287,7 +287,7 @@ export default function ComposeLetterForm({
 
 function OriginalLetter({ reply }: { reply: ReplyContext }) {
   return (
-    <div className="panel" style={{ position: 'sticky', top: 20 }}>
+    <div className="panel reply-original">
       <div className="panel-header">
         <span>┌── FROM @{reply.fromHandle} ──┐</span>
         <span className="muted">{timeAgo(reply.createdAt)}</span>

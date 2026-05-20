@@ -309,3 +309,13 @@ input::placeholder, textarea::placeholder {
   color: var(--paper);
   border-bottom-color: var(--accent);
 }
+
+.reply-original {
+  position: static;
+}
+@media (min-width: 780px) {
+  .reply-original {
+    position: sticky;
+    top: 20px;
+  }
+}
