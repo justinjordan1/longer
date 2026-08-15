@@ -171,7 +171,7 @@ export default function ComposeLetterForm({
         <div className="scheduled" style={{ marginBottom: 18 }}>
           <div className="smallcaps muted" style={{ fontSize: 11.5, marginBottom: 4 }}>delivery</div>
           <div style={{ fontSize: 13 }}>
-            letters go straight to the recipient&apos;s mailroom. they can read, report, or block you. max 3 letters per day to the same person.
+            letters go straight to the recipient&apos;s mailroom. they can read, report, or block you.
           </div>
         </div>
 

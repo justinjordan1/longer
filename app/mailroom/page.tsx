@@ -1,6 +1,7 @@
 import Link from 'next/link'
 import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
+import { LETTER_MIN_WORDS } from '@/lib/longer'
 import InboxList, { type LetterStub } from './InboxList'
 import BlockList, { type BlockedStub } from './BlockList'
 import LetterDraftsToggle, { type LetterDraftStub } from './LetterDraftsToggle'
@@ -167,7 +168,7 @@ export default async function MailroomPage({
       <BlockList blocked={blocked} />
 
       <p className="muted" style={{ fontSize: 11.5, marginTop: 22, lineHeight: 1.6 }}>
-        › letters are private. minimum 100 words, max 3 letters per day to the same person. mods can review reported letters.
+        › letters are private. minimum {LETTER_MIN_WORDS} words. mods can review reported letters.
       </p>
 
       <EmailNotifyToggle enabled={prefsRes.data?.letter_email_notifications !== false} />
