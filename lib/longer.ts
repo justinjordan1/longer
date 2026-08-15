@@ -27,15 +27,6 @@ export function flagByValue(v: string | null) {
   return FLAG_PRESETS.find((f) => f.value === v) ?? null
 }
 
-// supabase embeds a joined profile as an object or a single-element array
-// depending on how the relationship is inferred; normalize both shapes.
-export type ProfileRelation = { handle: string } | { handle: string }[] | null
-
-export function profileHandle(profile: ProfileRelation): string {
-  if (Array.isArray(profile)) return profile[0]?.handle ?? '?'
-  return profile?.handle ?? '?'
-}
-
 export function countWords(s: string): number {
   const t = s.trim()
   return t ? t.split(/\s+/).length : 0

@@ -1,8 +1,10 @@
 import Link from 'next/link'
 import { notFound } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
-import { timeAgo, flagByValue, profileHandle, type ProfileRelation } from '@/lib/longer'
+import { timeAgo, flagByValue } from '@/lib/longer'
 import PostInteractions from './PostInteractions'
+
+type ProfileRelation = { handle: string } | { handle: string }[] | null
 
 type PostRow = {
   id: string
@@ -188,6 +190,11 @@ export default async function PostPage({
       )}
     </div>
   )
+}
+
+function profileHandle(profile: ProfileRelation) {
+  if (Array.isArray(profile)) return profile[0]?.handle ?? '?'
+  return profile?.handle ?? '?'
 }
 
 function renderInlineFormatting(text: string) {

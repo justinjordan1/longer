@@ -1,8 +1,10 @@
 import Link from 'next/link'
 import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
-import { timeAgo, flagByValue, profileHandle, type ProfileRelation } from '@/lib/longer'
+import { timeAgo, flagByValue } from '@/lib/longer'
 import ModRowActions from './ModRowActions'
+
+type ProfileRelation = { handle: string } | { handle: string }[] | null
 
 type ReportRow = {
   post_id: string
@@ -18,13 +20,13 @@ type LetterReportRow = {
   profiles: ProfileRelation
 }
 
-type ReportedLetter = {
+type LetterRowForMod = {
   id: string
   title: string
   body: string
   created_at: string
-  sender_handle: string
-  recipient_handle: string
+  sender:    ProfileRelation
+  recipient: ProfileRelation
 }
 
 type ModPostRow = {
@@ -57,29 +59,10 @@ export default async function ModConsolePage() {
     redirect('/')
   }
 
-  const [
-    { data: reportedRaw },
-    { data: letterReportsRaw },
-    lettersRes,
-    { data: recent },
-  ] = await Promise.all([
-    supabase
-      .from('reports')
-      .select('post_id, kind, profiles:reporter_id(handle)')
-      .is('dismissed_at', null),
-    supabase
-      .from('letter_reports')
-      .select('id, letter_id, kind, created_at, profiles:reporter_id(handle)')
-      .is('dismissed_at', null)
-      .order('created_at', { ascending: false }),
-    supabase.rpc('mod_reported_letters'),
-    supabase
-      .from('posts_with_metrics')
-      .select('id, title, publish_at, is_removed, editorial_flag, up_count, down_count, comment_count, profiles!inner(handle)')
-      .lte('publish_at', new Date().toISOString())
-      .order('publish_at', { ascending: false })
-      .limit(30),
-  ])
+  const { data: reportedRaw } = await supabase
+    .from('reports')
+    .select('post_id, kind, profiles:reporter_id(handle)')
+    .is('dismissed_at', null)
 
   const reportedByPost = new Map<string, { hateful: string[]; ai: string[] }>()
   for (const r of (reportedRaw ?? []) as ReportRow[]) {
@@ -98,14 +81,38 @@ export default async function ModConsolePage() {
         .in('id', reportedPostIds)
     : { data: [] }
 
+  const { data: letterReportsRaw } = await supabase
+    .from('letter_reports')
+    .select('id, letter_id, kind, created_at, profiles:reporter_id(handle)')
+    .is('dismissed_at', null)
+    .order('created_at', { ascending: false })
+
+  const letterReports = (letterReportsRaw ?? []) as LetterReportRow[]
+  const reportedLetterIds = Array.from(new Set(letterReports.map(r => r.letter_id)))
+  const { data: reportedLettersRaw } = reportedLetterIds.length > 0
+    ? await supabase
+        .from('letters')
+        .select('id, title, body, created_at, sender:sender_id(handle), recipient:recipient_id(handle)')
+        .in('id', reportedLetterIds)
+    : { data: [] }
+
+  const lettersById = new Map<string, LetterRowForMod>()
+  for (const l of (reportedLettersRaw ?? []) as LetterRowForMod[]) {
+    lettersById.set(l.id, l)
+  }
+
   const reportsByLetter = new Map<string, LetterReportRow[]>()
-  for (const r of (letterReportsRaw ?? []) as LetterReportRow[]) {
+  for (const r of letterReports) {
     if (!reportsByLetter.has(r.letter_id)) reportsByLetter.set(r.letter_id, [])
     reportsByLetter.get(r.letter_id)!.push(r)
   }
 
-  const reportedLetters = (lettersRes.data ?? []) as ReportedLetter[]
-  const lettersLoadError = lettersRes.error?.message ?? null
+  const { data: recent } = await supabase
+    .from('posts_with_metrics')
+    .select('id, title, publish_at, is_removed, editorial_flag, up_count, down_count, comment_count, profiles!inner(handle)')
+    .lte('publish_at', new Date().toISOString())
+    .order('publish_at', { ascending: false })
+    .limit(30)
 
   return (
     <div style={{ maxWidth: 1100, margin: '0 auto', padding: '24px 20px' }}>
@@ -120,7 +127,6 @@ export default async function ModConsolePage() {
         </div>
         <div className="panel-body" style={{ padding: 16, fontSize: 13, lineHeight: 1.7 }}>
           <div>posts with open reports: <strong>{reportedByPost.size}</strong></div>
-          <div>letters with open reports: <strong>{reportsByLetter.size}</strong></div>
           <div className="muted" style={{ fontSize: 12 }}>
             › ai-language reports are aggregate signal only. they do not require action.
           </div>
@@ -184,22 +190,20 @@ export default async function ModConsolePage() {
           <span className="muted">{reportsByLetter.size}</span>
         </div>
         <div>
-          {lettersLoadError && (
-            <div className="panel-body caution" style={{ fontSize: 12, fontStyle: 'italic' }}>
-              ⚠ could not load reported letters: {lettersLoadError}
-            </div>
-          )}
-          {!lettersLoadError && reportedLetters.length === 0 && (
+          {reportsByLetter.size === 0 && (
             <div className="panel-body muted" style={{ fontSize: 13, fontStyle: 'italic' }}>
               › no reported letters.
             </div>
           )}
-          {reportedLetters.map((letter) => {
-            const reps = reportsByLetter.get(letter.id) ?? []
+          {Array.from(reportsByLetter.entries()).map(([letterId, reps]) => {
+            const letter = lettersById.get(letterId)
+            if (!letter) return null
+            const sender = profileHandle(letter.sender)
+            const recipient = profileHandle(letter.recipient)
             return (
-              <div key={letter.id} style={{ borderTop: '1px dashed var(--rule)', padding: 14 }}>
+              <div key={letterId} style={{ borderTop: '1px dashed var(--rule)', padding: 14 }}>
                 <div className="muted" style={{ fontSize: 11.5, marginBottom: 4 }}>
-                  <span className="accent">@</span>{letter.sender_handle} → <span className="accent">@</span>{letter.recipient_handle}
+                  <span className="accent">@</span>{sender} → <span className="accent">@</span>{recipient}
                   {' · '}{timeAgo(letter.created_at)} ago
                 </div>
                 <div style={{ fontWeight: 600, fontSize: 14, marginBottom: 4 }}>
@@ -212,8 +216,7 @@ export default async function ModConsolePage() {
                   <span className="accent">! reports ({reps.length}):</span>{' '}
                   <span className="muted">
                     {reps.map(r => `@${profileHandle(r.profiles)} (${r.kind})`).join(', ')}
-                  </span>{' · '}
-                  <ModRowActions letterId={letter.id} action="dismiss-letter-reports" />
+                  </span>
                 </div>
               </div>
             )
@@ -260,4 +263,9 @@ export default async function ModConsolePage() {
       </div>
     </div>
   )
+}
+
+function profileHandle(profile: ProfileRelation) {
+  if (Array.isArray(profile)) return profile[0]?.handle ?? '?'
+  return profile?.handle ?? '?'
 }

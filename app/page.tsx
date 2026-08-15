@@ -1,6 +1,6 @@
 import { createClient } from '@/lib/supabase/server'
 import Link from 'next/link'
-import { timeAgo, flagByValue, profileHandle, type ProfileRelation } from '@/lib/longer'
+import { timeAgo, flagByValue } from '@/lib/longer'
 import LiveTimeUntil from './LiveTimeUntil'
 import FavoritesPrompt from './FavoritesPrompt'
 import IntroBanner from './IntroBanner'
@@ -24,18 +24,31 @@ type FeedPost = {
   handle: string
 }
 
-type FeedPostRow = {
+type PostRow = {
   id: string
   title: string
   publish_at: string
   word_count: number
   is_removed: boolean
   editorial_flag: string | null
+  profiles: { handle: string } | { handle: string }[] | null
+}
+
+type MetricRow = {
   up_count: number
   down_count: number
   comment_count: number
   last_comment_at: string | null
-  profiles: ProfileRelation
+}
+
+type VoteMetricRow = {
+  post_id: string
+  direction: 'up' | 'down'
+}
+
+type CommentMetricRow = {
+  post_id: string
+  created_at: string
 }
 
 type ProfilePromptRow = {
@@ -61,15 +74,6 @@ function parsePage(s: string | undefined): number {
   return Number.isFinite(n) && n >= 1 ? Math.floor(n) : 1
 }
 
-// build a front-page href, omitting params at their defaults (page 1, empty)
-function feedHref(params: Record<string, string | number>): string {
-  const qs = Object.entries(params)
-    .filter(([, v]) => v !== undefined && v !== '' && v !== 1)
-    .map(([k, v]) => `${k}=${v}`)
-    .join('&')
-  return qs ? `/?${qs}` : '/'
-}
-
 function windowCutoff(w: Window): string | null {
   const now = Date.now()
   if (w === 'week')  return new Date(now - 7  * 24 * 3600 * 1000).toISOString()
@@ -93,12 +97,26 @@ export default async function FeedPage({
   const nowIso = new Date().toISOString()
 
   const postsRes = await supabase
-    .from('posts_with_metrics')
-    .select('id, title, publish_at, word_count, is_removed, editorial_flag, up_count, down_count, comment_count, last_comment_at, profiles(handle)')
+    .from('posts')
+    .select('id, title, publish_at, word_count, is_removed, editorial_flag, profiles:author_id(handle)')
     .lte('publish_at', nowIso)
     .eq('post_visibility', 'feed')
 
-  const postRows = (postsRes.data ?? []) as unknown as FeedPostRow[]
+  const postRows = (postsRes.data ?? []) as PostRow[]
+  const postIds = postRows.map(post => post.id)
+  const [votesRes, commentMetricsRes] = postIds.length > 0
+    ? await Promise.all([
+        supabase
+          .from('votes')
+          .select('post_id, direction')
+          .in('post_id', postIds),
+        supabase
+          .from('comments')
+          .select('post_id, created_at')
+          .in('post_id', postIds)
+          .eq('is_removed', false),
+      ])
+    : [{ data: [] }, { data: [] }]
 
   let profile: ProfilePromptRow | null = null
   let favoriteCount = 0
@@ -149,20 +167,49 @@ export default async function FeedPage({
     favoriteCount === 0
   const shouldShowIntroBanner = !profile?.dismissed_intro_banner
 
-  const allPosts: FeedPost[] = postRows.map((p) => ({
-    id: p.id,
-    title: p.title,
-    publish_at: p.publish_at,
-    word_count: p.word_count,
-    is_removed: p.is_removed,
-    editorial_flag: p.editorial_flag,
-    handle: profileHandle(p.profiles),
-    up_count: p.up_count,
-    down_count: p.down_count,
-    comment_count: p.comment_count,
-    last_comment_at: p.last_comment_at,
-    considered_score: (p.up_count - p.down_count) + p.comment_count * 3,
-  }))
+  const metricsById = new Map<string, MetricRow>()
+  for (const postId of postIds) {
+    metricsById.set(postId, {
+      up_count: 0,
+      down_count: 0,
+      comment_count: 0,
+      last_comment_at: null,
+    })
+  }
+
+  for (const vote of (votesRes.data ?? []) as VoteMetricRow[]) {
+    const metrics = metricsById.get(vote.post_id)
+    if (!metrics) continue
+    if (vote.direction === 'up') metrics.up_count += 1
+    if (vote.direction === 'down') metrics.down_count += 1
+  }
+
+  for (const comment of (commentMetricsRes.data ?? []) as CommentMetricRow[]) {
+    const metrics = metricsById.get(comment.post_id)
+    if (!metrics) continue
+    metrics.comment_count += 1
+    if (!metrics.last_comment_at || comment.created_at > metrics.last_comment_at) {
+      metrics.last_comment_at = comment.created_at
+    }
+  }
+
+  const allPosts: FeedPost[] = postRows.map((p) => {
+    const m = metricsById.get(p.id) ?? { up_count: 0, down_count: 0, comment_count: 0, last_comment_at: null }
+    return {
+      id: p.id,
+      title: p.title,
+      publish_at: p.publish_at,
+      word_count: p.word_count,
+      is_removed: p.is_removed,
+      editorial_flag: p.editorial_flag,
+      handle: profileHandle(p.profiles),
+      up_count: m.up_count,
+      down_count: m.down_count,
+      comment_count: m.comment_count,
+      last_comment_at: m.last_comment_at,
+      considered_score: (m.up_count - m.down_count) + m.comment_count * 3,
+    }
+  })
 
   const npAll = [...allPosts].sort((a, b) => +new Date(b.publish_at) - +new Date(a.publish_at))
   const npTotal = npAll.length
@@ -372,7 +419,14 @@ function Pagination({
     return <div className="muted" style={{ fontSize: 11.5, textAlign: 'center' }}>page 1 of 1</div>
   }
 
-  const buildHref = (page: number) => feedHref({ ...otherParams, [paramName]: page })
+  const buildHref = (page: number) => {
+    const all = { ...otherParams, [paramName]: page }
+    const qs = Object.entries(all)
+      .filter(([, v]) => v !== undefined && v !== '' && v !== 1)
+      .map(([k, v]) => `${k}=${v}`)
+      .join('&')
+    return qs ? `/?${qs}` : '/'
+  }
 
   const windowSize = 5
   const initialStart = Math.max(1, currentPage - Math.floor(windowSize / 2))
@@ -409,9 +463,15 @@ function WindowSwitcher({
   current: Window
   otherParams: Record<string, string | number>
 }) {
-  const buildHref = (w: Window) =>
-    // 'week' is the default, omit from URL
-    feedHref(w === 'week' ? otherParams : { ...otherParams, mc: w })
+  const buildHref = (w: Window) => {
+    const all: Record<string, string | number> = { ...otherParams }
+    if (w !== 'week') all.mc = w   // 'week' is the default, omit from URL
+    const qs = Object.entries(all)
+      .filter(([, v]) => v !== undefined && v !== '' && v !== 1)
+      .map(([k, v]) => `${k}=${v}`)
+      .join('&')
+    return qs ? `/?${qs}` : '/'
+  }
 
   const renderWindowLink = (w: Window, label: string) => (
     w === current
@@ -428,4 +488,9 @@ function WindowSwitcher({
       {renderWindowLink('all', 'all')}
     </div>
   )
+}
+
+function profileHandle(profile: PostRow['profiles']) {
+  if (Array.isArray(profile)) return profile[0]?.handle ?? '?'
+  return profile?.handle ?? '?'
 }
