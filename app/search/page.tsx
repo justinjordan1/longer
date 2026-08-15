@@ -1,6 +1,6 @@
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/server'
-import { timeAgo, flagByValue } from '@/lib/longer'
+import { timeAgo, flagByValue, profileHandle, type ProfileRelation } from '@/lib/longer'
 import SearchBox from './SearchBox'
 
 export const metadata = { title: 'Search · LONGER' }
@@ -31,7 +31,7 @@ type PostSearchRow = {
   word_count: number
   is_removed: boolean
   editorial_flag: string | null
-  profiles: { handle: string } | { handle: string }[] | null
+  profiles: ProfileRelation
 }
 
 function makeSnippet(body: string, q: string, max = 200): string {
@@ -193,9 +193,4 @@ export default async function SearchPage({
       )}
     </div>
   )
-}
-
-function profileHandle(profile: PostSearchRow['profiles']) {
-  if (Array.isArray(profile)) return profile[0]?.handle ?? '?'
-  return profile?.handle ?? '?'
 }

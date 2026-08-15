@@ -1,12 +1,34 @@
 'use client'
 import { useTransition } from 'react'
 import { useRouter } from 'next/navigation'
-import { modDismissReports, modRemovePost, modRestorePost } from '@/app/actions/mod'
+import {
+  modDismissLetterReports,
+  modDismissReports,
+  modRemovePost,
+  modRestorePost,
+} from '@/app/actions/mod'
 
 type Props =
   | { postId: string; action: 'dismiss'; kind: 'hateful' | 'ai' }
   | { postId: string; action: 'remove' }
   | { postId: string; action: 'restore' }
+  | { letterId: string; action: 'dismiss-letter-reports' }
+
+function run(props: Props) {
+  switch (props.action) {
+    case 'dismiss':                return modDismissReports(props.postId, props.kind)
+    case 'remove':                 return modRemovePost(props.postId)
+    case 'restore':                return modRestorePost(props.postId)
+    case 'dismiss-letter-reports': return modDismissLetterReports(props.letterId)
+  }
+}
+
+const LABELS: Record<Props['action'], string> = {
+  'dismiss':                'dismiss',
+  'remove':                 '[remove]',
+  'restore':                '[restore]',
+  'dismiss-letter-reports': '[dismiss reports]',
+}
 
 export default function ModRowActions(props: Props) {
   const router = useRouter()
@@ -14,23 +36,16 @@ export default function ModRowActions(props: Props) {
 
   const handle = () => {
     startTransition(async () => {
-      if (props.action === 'dismiss') await modDismissReports(props.postId, props.kind)
-      else if (props.action === 'remove') await modRemovePost(props.postId)
-      else await modRestorePost(props.postId)
+      await run(props)
       router.refresh()
     })
   }
-
-  const label =
-    props.action === 'dismiss' ? 'dismiss' :
-    props.action === 'remove'  ? '[remove]' :
-                                 '[restore]'
 
   const cls = props.action === 'remove' ? 'link accent' : 'link'
 
   return (
     <button onClick={handle} disabled={pending} className={cls} style={{ fontSize: 12 }}>
-      {pending ? '...' : label}
+      {pending ? '...' : LABELS[props.action]}
     </button>
   )
 }

@@ -2,7 +2,6 @@
 import { createClient } from '@/lib/supabase/server'
 import { revalidatePath } from 'next/cache'
 import { redirect } from 'next/navigation'
-import { after } from 'next/server'
 import { LETTER_MIN_WORDS, countWords } from '@/lib/longer'
 import { notifyLetterRecipient } from '@/lib/letter-notifications'
 
@@ -78,17 +77,18 @@ export async function sendLetter(formData: FormData) {
     .eq('id', user.id)
     .maybeSingle()
 
-  // the letter is already delivered; the email goes out after the response so
-  // a slow provider never holds up the send.
-  after(() =>
-    notifyLetterRecipient({
-      recipientId: recipientProfile.id,
-      recipientHandle: recipientProfile.handle,
-      senderHandle: senderProfile?.handle ?? 'someone',
-      title,
-      wordCount,
-    })
-  )
+  // Awaited inside the request rather than deferred to after(): the send is
+  // capped at 8s by the fetch timeout, and anything logged here is captured
+  // with the request instead of arriving after the response, where it is
+  // easily lost. The letter is already committed, so a slow or failing
+  // provider costs latency, never delivery.
+  await notifyLetterRecipient({
+    recipientId: recipientProfile.id,
+    recipientHandle: recipientProfile.handle,
+    senderHandle: senderProfile?.handle ?? 'someone',
+    title,
+    wordCount,
+  })
 
   revalidatePath('/mailroom')
   revalidatePath('/')
