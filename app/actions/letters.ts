@@ -2,7 +2,9 @@
 import { createClient } from '@/lib/supabase/server'
 import { revalidatePath } from 'next/cache'
 import { redirect } from 'next/navigation'
+import { after } from 'next/server'
 import { LETTER_MIN_WORDS, countWords } from '@/lib/longer'
+import { notifyLetterRecipient } from '@/lib/letter-notifications'
 
 type LetterReportKind = 'hateful' | 'spam' | 'other'
 
@@ -69,6 +71,24 @@ export async function sendLetter(formData: FormData) {
       .eq('id', draftId)
       .eq('author_id', user.id)
   }
+
+  const { data: senderProfile } = await supabase
+    .from('profiles')
+    .select('handle')
+    .eq('id', user.id)
+    .maybeSingle()
+
+  // the letter is already delivered; the email goes out after the response so
+  // a slow provider never holds up the send.
+  after(() =>
+    notifyLetterRecipient({
+      recipientId: recipientProfile.id,
+      recipientHandle: recipientProfile.handle,
+      senderHandle: senderProfile?.handle ?? 'someone',
+      title,
+      wordCount,
+    })
+  )
 
   revalidatePath('/mailroom')
   revalidatePath('/')
@@ -209,6 +229,22 @@ export async function unblockSender(blockedId: string) {
 
   revalidatePath('/mailroom')
   return { success: true }
+}
+
+export async function setLetterEmailNotifications(enabled: boolean) {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return { error: 'not authenticated' }
+
+  const { error } = await supabase
+    .from('profiles')
+    .update({ letter_email_notifications: enabled })
+    .eq('id', user.id)
+
+  if (error) return { error: error.message }
+
+  revalidatePath('/mailroom')
+  return { success: true, enabled }
 }
 
 export async function reportLetter(letterId: string, kind: LetterReportKind) {

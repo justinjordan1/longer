@@ -50,6 +50,8 @@ export async function middleware(request: NextRequest) {
     path === '/beta' ||
     path === '/guidelines' ||
     path === '/search' ||
+    path === '/unsubscribe' ||
+    path === '/api/letters/unsubscribe' ||
     path.startsWith('/post/') ||
     (path.startsWith('/u/') && !isProfileEdit) ||
     path.startsWith('/auth/')

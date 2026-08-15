@@ -4,6 +4,7 @@ import { createClient } from '@/lib/supabase/server'
 import InboxList, { type LetterStub } from './InboxList'
 import BlockList, { type BlockedStub } from './BlockList'
 import LetterDraftsToggle, { type LetterDraftStub } from './LetterDraftsToggle'
+import EmailNotifyToggle from './EmailNotifyToggle'
 
 type ProfileRel = { id: string; handle: string } | { id: string; handle: string }[] | null
 
@@ -65,6 +66,12 @@ export default async function MailroomPage({
     .select('blocked_id, created_at, blocked:blocked_id(id, handle)')
     .eq('blocker_id', user.id)
     .order('created_at', { ascending: false })
+
+  const prefsRes = await supabase
+    .from('profiles')
+    .select('letter_email_notifications')
+    .eq('id', user.id)
+    .maybeSingle()
 
   const draftsRes = await supabase
     .from('letter_drafts')
@@ -162,6 +169,8 @@ export default async function MailroomPage({
       <p className="muted" style={{ fontSize: 11.5, marginTop: 22, lineHeight: 1.6 }}>
         › letters are private. minimum 100 words, max 3 letters per day to the same person. mods can review reported letters.
       </p>
+
+      <EmailNotifyToggle enabled={prefsRes.data?.letter_email_notifications !== false} />
     </div>
   )
 }
