@@ -35,6 +35,7 @@ export async function GET() {
   const admin = createAdminClient()
   let preferenceCheck: unknown = 'skipped: no service-role client'
   let addressCheck: unknown = 'skipped: no service-role client'
+  let updateCheck: unknown = 'skipped: preference read failed'
 
   if (admin) {
     const { data, error } = await admin
@@ -51,6 +52,23 @@ export async function GET() {
     addressCheck = accountError
       ? { ok: false, error: accountError.message }
       : { ok: true, has_address: Boolean(account?.user?.email) }
+
+    // The unsubscribe endpoint writes as service_role for a user with no
+    // session. Write the value back unchanged: a grant problem surfaces as an
+    // error, and RLS blocking the role surfaces as zero rows touched.
+    if (!error) {
+      const { data: written, error: writeError } = await admin
+        .from('profiles')
+        .update({ letter_email_notifications: data?.letter_email_notifications ?? true })
+        .eq('id', user.id)
+        .select('id')
+
+      updateCheck = writeError
+        ? { ok: false, error: writeError.message }
+        : written && written.length > 0
+          ? { ok: true, rows_touched: written.length }
+          : { ok: false, error: 'zero rows touched -- RLS is blocking service_role writes' }
+    }
   }
 
   // is the Resend key accepted? listing domains proves the key without sending.
@@ -70,6 +88,7 @@ export async function GET() {
   return NextResponse.json({
     env,
     preferenceCheck,
+    updateCheck,
     addressCheck,
     resendCheck,
     unsubscribeTokenSigning: createUnsubscribeToken(user.id) ? 'ok' : 'FAILED (no service-role key)',
