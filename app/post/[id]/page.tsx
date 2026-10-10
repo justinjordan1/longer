@@ -38,6 +38,28 @@ type VoteCountRow = {
   direction: 'up' | 'down'
 }
 
+export async function generateMetadata({
+  params,
+}: {
+  params: Promise<{ id: string }>
+}) {
+  const { id } = await params
+  const supabase = await createClient()
+  const { data } = await supabase
+    .from('posts')
+    .select('title')
+    .eq('id', id)
+    .lte('publish_at', new Date().toISOString())
+    .maybeSingle()
+
+  const title = data?.title ? `Longer - "${data.title}"` : 'LONGER'
+  return {
+    title,
+    openGraph: { title, siteName: 'LONGER', type: 'article' },
+    twitter: { title },
+  }
+}
+
 export default async function PostPage({
   params,
 }: {
