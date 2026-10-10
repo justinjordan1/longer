@@ -2,6 +2,7 @@ import './globals.css'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/server'
 import SignOutButton from './SignOutButton'
+import CopyGuard from './CopyGuard'
 
 export const metadata = {
   title: 'LONGER',
@@ -49,6 +50,7 @@ export default async function RootLayout({
   return (
     <html lang="en">
       <body>
+        <CopyGuard />
         {profile && (
           <header style={{ borderBottom: '2px solid var(--ink)' }}>
             <div style={{

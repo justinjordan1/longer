@@ -199,6 +199,12 @@ input::placeholder, textarea::placeholder {
   font-size: 14.5px;
   line-height: 1.75;
 }
+/* readers can't select or copy someone else's writing */
+.no-copy {
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-touch-callout: none;
+}
 .essay-prose p { margin: 0 0 1em; white-space: pre-wrap; }
 
 .comment-block {

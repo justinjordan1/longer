@@ -300,7 +300,7 @@ function OriginalLetter({ reply }: { reply: ReplyContext }) {
           {reply.wordCount} wd
         </div>
         <div
-          className="essay-prose"
+          className="essay-prose no-copy"
           style={{ whiteSpace: 'pre-wrap', fontSize: 13.5, lineHeight: 1.65, maxHeight: 520, overflow: 'auto' }}
         >
           {reply.body}

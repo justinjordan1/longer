@@ -155,7 +155,7 @@ export default async function PostPage({
               [ this post has been removed by a moderator ]
             </div>
           ) : (
-            <div className="essay-prose">
+            <div className="essay-prose no-copy">
               {post.body.split(/\n\n+/).map((para: string, i: number) => (
                 <p key={i}>{renderInlineFormatting(para)}</p>
               ))}

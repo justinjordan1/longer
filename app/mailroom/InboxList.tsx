@@ -187,7 +187,7 @@ export default function InboxList({
               <h2 style={{ fontSize: 22, fontWeight: 700, margin: '4px 0 14px', lineHeight: 1.3 }}>
                 {reading.title || <span className="muted">[untitled letter]</span>}
               </h2>
-              <div className="essay-prose" style={{ whiteSpace: 'pre-wrap' }}>
+              <div className="essay-prose no-copy" style={{ whiteSpace: 'pre-wrap' }}>
                 {reading.body}
               </div>
             </div>

@@ -271,7 +271,7 @@ export default function PostInteractions(props: Props) {
                   <div className="muted" style={{ fontSize: 11.5, marginBottom: 4 }}>
                     {String(i + 1).padStart(3, '0')} · <Link href={`/u/${c.handle}`} style={{ color: 'inherit', textDecoration: 'underline', textUnderlineOffset: 3 }}><span className="accent">@</span>{c.handle}</Link> · {timeAgo(c.created_at)} ago · {c.word_count} wd
                   </div>
-                  <div style={{ fontSize: 13.5, lineHeight: 1.65, marginBottom: 6 }}>{c.body}</div>
+                  <div className="no-copy" style={{ fontSize: 13.5, lineHeight: 1.65, marginBottom: 6 }}>{c.body}</div>
                   {canInteract && (
                     <div style={{ fontSize: 11.5 }}>
                       {replyingTo === c.id ? (
@@ -289,7 +289,7 @@ export default function PostInteractions(props: Props) {
                           <div className="muted" style={{ fontSize: 11.5, marginBottom: 4 }}>
                             ↳ {String(ri + 1).padStart(2, '0')} · <Link href={`/u/${r.handle}`} style={{ color: 'inherit', textDecoration: 'underline', textUnderlineOffset: 3 }}><span className="accent">@</span>{r.handle}</Link> · {timeAgo(r.created_at)} ago · {r.word_count} wd
                           </div>
-                          <div style={{ fontSize: 13.5, lineHeight: 1.65 }}>{r.body}</div>
+                          <div className="no-copy" style={{ fontSize: 13.5, lineHeight: 1.65 }}>{r.body}</div>
                         </div>
                       ))}
                     </div>
